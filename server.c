@@ -29,11 +29,15 @@ void getargs(int* port, int* threads, int* queue_size, char** schedalg, int argc
 }
 
 void* worker_thread(void* arg) {
-    if (arg == NULL) {
-        fprintf(stderr, "Error: worker_thread received NULL argument\n");
-        return NULL;
-    }
-    threads_stats* t_stats = (threads_stats*)arg;
+    int thread_id = *((int*)arg); // Get thread index
+    free(arg); // Free dynamically allocated thread ID
+
+    // Initialize thread statistics
+    threads_stats t_stats;
+    t_stats.id = thread_id;
+    t_stats.stat_req = 0;
+    t_stats.dynm_req = 0;
+    t_stats.total_req = 0;
 
     while (1) {
         pthread_mutex_lock(&request_queue.lock);
@@ -47,11 +51,9 @@ void* worker_thread(void* arg) {
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
 
-        requestHandle(req.connfd, req.arrival, dispatch, t_stats);
+        requestHandle(req.connfd, req.arrival, dispatch, &t_stats);
         Close(req.connfd);
     }
-
-    free(t_stats);
     return NULL;
 }
 
@@ -76,19 +78,16 @@ int main(int argc, char* argv[]) {
 
     // Create worker threads
     for (int i = 0; i < threads; i++) {
-        threads_stats* t_stats = malloc(sizeof(threads_stats));
-        if (t_stats == NULL) {
-            fprintf(stderr, "Error: Thread stats memory allocation failed\n");
+        int* thread_id = malloc(sizeof(int));
+        if (thread_id == NULL) {
+            fprintf(stderr, "Error: Failed to allocate memory for thread ID\n");
             exit(1);
         }
-        t_stats->id = i;
-        t_stats->stat_req = 0;
-        t_stats->dynm_req = 0;
-        t_stats->total_req = 0;
+        *thread_id = i;
 
-        if (pthread_create(&worker_threads[i], NULL, worker_thread, (void*)t_stats) != 0) {
+        if (pthread_create(&worker_threads[i], NULL, worker_thread, (void*)thread_id) != 0) {
             fprintf(stderr, "Error: Failed to create thread %d\n", i);
-            free(t_stats);
+            free(thread_id);
             exit(1);
         }
     }
