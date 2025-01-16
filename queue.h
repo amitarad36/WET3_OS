@@ -26,5 +26,6 @@ Request dequeue(Queue* q);
 int isQueueEmpty(Queue* q);
 int isQueueFull(Queue* q);
 void dropRandomRequest(Queue* q);
+void destroyQueue(Queue* q);
 
 #endif
