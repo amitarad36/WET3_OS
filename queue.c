@@ -7,7 +7,11 @@ void initQueue(Queue* q, int capacity) {
     q->size = 0;
     q->front = 0;
     q->rear = -1;
-    q->buffer = malloc(sizeof(Request) * capacity);
+    q->buffer = malloc(sizeof(Request) * capacity); 
+    if (q->buffer == NULL) {
+        fprintf(stderr, "Error: Queue memory allocation failed\n");
+        exit(1);
+    }
     pthread_mutex_init(&q->lock, NULL);
     pthread_cond_init(&q->not_empty, NULL);
     pthread_cond_init(&q->not_full, NULL);
@@ -20,11 +24,16 @@ void enqueue(Queue* q, Request req) {
 }
 
 Request dequeue(Queue* q) {
+    if (q->size == 0) {
+        fprintf(stderr, "Error: Trying to dequeue from an empty queue\n");
+        exit(1);
+    }
     Request req = q->buffer[q->front];
     q->front = (q->front + 1) % q->capacity;
     q->size--;
     return req;
 }
+
 
 int isQueueFull(Queue* q) {
     return q->size == q->capacity;

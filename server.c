@@ -14,18 +14,7 @@
 #include "request.h"
 #include "queue.h"
 
-
-// 
-// server.c: A very, very simple web server
-//
-// To run:
-//  ./server <portnum (above 2000)>
-//
-// Repeatedly handles HTTP requests sent to this port number.
-// Most of the work is done within routines written in request.c
-//
-
-
+// Global request queue
 Queue request_queue;
 
 void getargs(int* port, int* threads, int* queue_size, char** schedalg, int argc, char* argv[]) {
@@ -39,8 +28,13 @@ void getargs(int* port, int* threads, int* queue_size, char** schedalg, int argc
     *schedalg = argv[4];
 }
 
-
 void* worker_thread(void* arg) {
+    if (arg == NULL) {
+        fprintf(stderr, "Error: worker_thread received NULL argument\n");
+        return NULL;
+    }
+    threads_stats* t_stats = (threads_stats*)arg;
+
     while (1) {
         pthread_mutex_lock(&request_queue.lock);
         while (isQueueEmpty(&request_queue)) {
@@ -52,13 +46,14 @@ void* worker_thread(void* arg) {
 
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
-        threads_stats t_stats = (threads_stats)arg;
+
         requestHandle(req.connfd, req.arrival, dispatch, t_stats);
         Close(req.connfd);
     }
+
+    free(t_stats);
     return NULL;
 }
-
 
 int main(int argc, char* argv[]) {
     int listenfd, connfd, port, clientlen;
@@ -72,11 +67,30 @@ int main(int argc, char* argv[]) {
 
     // Initialize thread pool and request queue
     pthread_t* worker_threads = malloc(sizeof(pthread_t) * threads);
+    if (worker_threads == NULL) {
+        fprintf(stderr, "Error: Failed to allocate memory for worker threads\n");
+        exit(1);
+    }
+
     initQueue(&request_queue, queue_size);
 
     // Create worker threads
     for (int i = 0; i < threads; i++) {
-        pthread_create(&worker_threads[i], NULL, worker_thread, NULL);
+        threads_stats* t_stats = malloc(sizeof(threads_stats));
+        if (t_stats == NULL) {
+            fprintf(stderr, "Error: Thread stats memory allocation failed\n");
+            exit(1);
+        }
+        t_stats->id = i;
+        t_stats->stat_req = 0;
+        t_stats->dynm_req = 0;
+        t_stats->total_req = 0;
+
+        if (pthread_create(&worker_threads[i], NULL, worker_thread, (void*)t_stats) != 0) {
+            fprintf(stderr, "Error: Failed to create thread %d\n", i);
+            free(t_stats);
+            exit(1);
+        }
     }
 
     listenfd = Open_listenfd(port);
@@ -130,10 +144,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-
-
-
-    
-
-
- 
