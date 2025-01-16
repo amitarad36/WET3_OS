@@ -63,7 +63,7 @@ void* worker_thread(void* arg) {
 
     // Free memory before exiting (not usually reached)
     free(t_stats);
-    return NULL;
+    pthread_exit(NULL);
 }
 
 int main(int argc, char* argv[]) {
