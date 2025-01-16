@@ -61,7 +61,7 @@ void* worker_thread(void* arg) {
         Close(req.connfd);
     }
 
-    // Free memory before exiting (won't be reached unless the server is stopped)
+    // Free memory before exiting (not usually reached)
     free(t_stats);
     return NULL;
 }
