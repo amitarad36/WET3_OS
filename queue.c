@@ -1,0 +1,42 @@
+#include "queue.h"
+#include <stdlib.h>
+#include <stdio.h>
+
+void initQueue(Queue* q, int capacity) {
+    q->capacity = capacity;
+    q->size = 0;
+    q->front = 0;
+    q->rear = -1;
+    q->buffer = malloc(sizeof(Request) * capacity);
+    pthread_mutex_init(&q->lock, NULL);
+    pthread_cond_init(&q->not_empty, NULL);
+    pthread_cond_init(&q->not_full, NULL);
+}
+
+void enqueue(Queue* q, Request req) {
+    q->rear = (q->rear + 1) % q->capacity;
+    q->buffer[q->rear] = req;
+    q->size++;
+}
+
+Request dequeue(Queue* q) {
+    Request req = q->buffer[q->front];
+    q->front = (q->front + 1) % q->capacity;
+    q->size--;
+    return req;
+}
+
+int isQueueFull(Queue* q) {
+    return q->size == q->capacity;
+}
+
+int isQueueEmpty(Queue* q) {
+    return q->size == 0;
+}
+
+void destroyQueue(Queue* q) {
+    free(q->buffer);
+    pthread_mutex_destroy(&q->lock);
+    pthread_cond_destroy(&q->not_empty);
+    pthread_cond_destroy(&q->not_full);
+}

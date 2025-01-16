@@ -25,6 +25,9 @@
 // Most of the work is done within routines written in request.c
 //
 
+
+Queue request_queue;
+
 void getargs(int* port, int* threads, int* queue_size, char** schedalg, int argc, char* argv[]) {
     if (argc < 5) {
         fprintf(stderr, "Usage: %s <port> <threads> <queue_size> <schedalg>\n", argv[0]);
