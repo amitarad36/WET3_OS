@@ -32,12 +32,18 @@ void* worker_thread(void* arg) {
     int thread_id = *((int*)arg); // Get thread index
     free(arg); // Free dynamically allocated thread ID
 
+    // Allocate memory for thread stats
+    threads_stats* t_stats = malloc(sizeof(threads_stats));
+    if (t_stats == NULL) {
+        fprintf(stderr, "Error: Failed to allocate memory for thread stats\n");
+        pthread_exit(NULL);
+    }
+
     // Initialize thread statistics
-    threads_stats t_stats;
-    t_stats.id = thread_id;
-    t_stats.stat_req = 0;
-    t_stats.dynm_req = 0;
-    t_stats.total_req = 0;
+    t_stats->id = thread_id;
+    t_stats->stat_req = 0;
+    t_stats->dynm_req = 0;
+    t_stats->total_req = 0;
 
     while (1) {
         pthread_mutex_lock(&request_queue.lock);
@@ -51,9 +57,12 @@ void* worker_thread(void* arg) {
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
 
-        requestHandle(req.connfd, req.arrival, dispatch, &t_stats);
+        requestHandle(req.connfd, req.arrival, dispatch, t_stats);
         Close(req.connfd);
     }
+
+    // Free memory before exiting (won't be reached unless the server is stopped)
+    free(t_stats);
     return NULL;
 }
 
