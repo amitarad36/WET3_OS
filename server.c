@@ -33,7 +33,7 @@ void* worker_thread(void* arg) {
     free(arg); // Free dynamically allocated thread ID
 
     // Allocate memory for thread stats
-    threads_stats* t_stats = malloc(sizeof(threads_stats));
+    threads_stats t_stats = malloc(sizeof(threads_stats));
     if (t_stats == NULL) {
         fprintf(stderr, "Error: Failed to allocate memory for thread stats\n");
         pthread_exit(NULL);
