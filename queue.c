@@ -40,3 +40,16 @@ void destroyQueue(Queue* q) {
     pthread_cond_destroy(&q->not_empty);
     pthread_cond_destroy(&q->not_full);
 }
+
+#include <time.h>
+
+void dropRandomRequest(Queue* q) {
+    if (q->size == 0) return;
+
+    int random_index = rand() % q->size;
+    for (int i = random_index; i < q->size - 1; i++) {
+        q->buffer[i] = q->buffer[i + 1];
+    }
+    q->size--;
+}
+

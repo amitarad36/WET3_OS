@@ -52,8 +52,8 @@ void* worker_thread(void* arg) {
 
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
-
-        requestHandle(req.connfd, req.arrival, dispatch, NULL);
+        threads_stats t_stats = (threads_stats)arg;
+        requestHandle(req.connfd, req.arrival, dispatch, t_stats);
         Close(req.connfd);
     }
     return NULL;

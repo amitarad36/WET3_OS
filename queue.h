@@ -24,5 +24,7 @@ void initQueue(Queue* q, int capacity);
 void enqueue(Queue* q, Request req);
 Request dequeue(Queue* q);
 int isQueueEmpty(Queue* q);
+int isQueueFull(Queue* q);
+void dropRandomRequest(Queue* q);
 
 #endif
