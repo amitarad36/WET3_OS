@@ -70,7 +70,6 @@ void destroyQueue(Queue* q) {
     pthread_cond_destroy(&q->not_full);
 }
 
-
 #include <time.h>
 
 void dropRandomRequests(Queue* q, int percentage) {
