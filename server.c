@@ -59,7 +59,7 @@ void getargs(int* port, int* threads, int* queue_size, char** schedalg, int argc
 }
 
 void* worker_thread(void* arg) {
-    threads_stats* t_stats = (threads_stats*)arg;
+    threads_stats t_stats = (threads_stats)arg;
 
     while (1) {
         pthread_mutex_lock(&request_queue.lock);
