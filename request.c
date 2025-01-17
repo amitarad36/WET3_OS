@@ -205,6 +205,17 @@ void requestServeStatic(int fd, char *filename, int filesize, struct timeval arr
 	Munmap(srcp, filesize);
 }
 
+int isStaticRequest(int fd) {
+	char buf[MAXLINE];
+	Rio_readlineb(&rio, buf, MAXLINE);  // Read request line
+
+	// Check if the request asks for a static file (no CGI execution)
+	if (strstr(buf, ".html") || strstr(buf, ".jpg") || strstr(buf, ".png") || strstr(buf, ".css") || strstr(buf, ".js")) {
+		return 1; // Static request
+	}
+	return 0; // Dynamic request
+}
+
 
 // handle a request
 void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats) {
