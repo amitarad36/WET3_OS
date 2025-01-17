@@ -24,8 +24,8 @@ typedef struct Queue {
 } Queue;
 
 void initQueue(Queue* q, int capacity);
-void enqueue(Queue* q, Request req);
-Request dequeue(Queue* q);
+void enqueue(Queue* q, Request req, int is_vip);
+Request dequeue(Queue* q, int vip);
 int isQueueEmpty(Queue* q);
 int isQueueFull(Queue* q);
 void dropRandomRequest(Queue* q);
