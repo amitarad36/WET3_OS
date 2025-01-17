@@ -18,6 +18,8 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
 int getRequestType(int fd);
 int isStaticRequest(int fd);  // Add this line
 void sendHttpResponseWithStats(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats); // Add this line
-
+void serveRequest(int fd);
+void requestServeStatic(int fd, char* filename);
+void requestServeDynamic(int fd, char* cgi_script);
 
 #endif

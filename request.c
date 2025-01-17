@@ -245,6 +245,71 @@ void sendHttpResponseWithStats(int fd, struct timeval arrival, struct timeval di
 	Rio_writen(fd, buf, strlen(buf));
 }
 
+void serveRequest(int fd) {
+	char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
+
+	// Read request line
+	Rio_readlineb(&rio, buf, MAXLINE);
+	sscanf(buf, "%s %s %s", method, uri, version);
+
+	// Only support GET requests
+	if (strcasecmp(method, "GET") != 0) {
+		requestError(fd, method, "501", "Not Implemented", "Server does not support this method");
+		return;
+	}
+
+	// Determine if request is static or dynamic
+	int is_static = isStaticRequest(fd);
+
+	if (is_static) {
+		requestServeStatic(fd, uri);
+	}
+	else {
+		requestServeDynamic(fd, uri);
+	}
+}
+
+void requestServeStatic(int fd, char* filename) {
+	struct stat sbuf;
+
+	if (stat(filename, &sbuf) < 0) {
+		requestError(fd, filename, "404", "Not Found", "File not found");
+		return;
+	}
+
+	int srcfd = open(filename, O_RDONLY, 0);
+	char* srcp = malloc(sbuf.st_size);
+	read(srcfd, srcp, sbuf.st_size);
+	close(srcfd);
+
+	// Send response headers
+	char buf[MAXLINE];
+	sprintf(buf, "HTTP/1.1 200 OK\r\n");
+	sprintf(buf, "%sServer: My Web Server\r\n", buf);
+	sprintf(buf, "%sContent-Length: %ld\r\n", buf, sbuf.st_size);
+	sprintf(buf, "%sContent-Type: text/html\r\n\r\n", buf);
+	Rio_writen(fd, buf, strlen(buf));
+
+	// Send response body
+	Rio_writen(fd, srcp, sbuf.st_size);
+	free(srcp);
+}
+
+void requestServeDynamic(int fd, char* cgi_script) {
+	char buf[MAXLINE];
+
+	// Send initial response headers
+	sprintf(buf, "HTTP/1.1 200 OK\r\n");
+	sprintf(buf, "%sServer: My Web Server\r\n\r\n", buf);
+	Rio_writen(fd, buf, strlen(buf));
+
+	// Execute the CGI script
+	if (fork() == 0) {
+		dup2(fd, STDOUT_FILENO);
+		execl(cgi_script, cgi_script, NULL);
+	}
+	wait(NULL);
+}
 
 // handle a request
 void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats) {
