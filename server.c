@@ -17,6 +17,23 @@
 // Global request queue
 Queue request_queue;
 
+void* vip_thread(void* arg) {
+    while (1) {
+        pthread_mutex_lock(&request_queue.lock);
+        while (isQueueEmpty(&request_queue) || request_queue.vip_size == 0) {
+            pthread_cond_wait(&request_queue.vip_not_empty, &request_queue.lock);
+        }
+        Request req = dequeue(&request_queue, 1); 
+        pthread_mutex_unlock(&request_queue.lock);
+
+        struct timeval dispatch;
+        gettimeofday(&dispatch, NULL);
+
+        requestHandle(req.connfd, req.arrival, dispatch, NULL);
+        Close(req.connfd);
+    }
+}
+
 void getargs(int* port, int* threads, int* queue_size, char** schedalg, int argc, char* argv[]) {
     if (argc < 5) {
         fprintf(stderr, "Usage: %s <port> <threads> <queue_size> <schedalg>\n", argv[0]);
@@ -47,11 +64,10 @@ void* worker_thread(void* arg) {
 
     while (1) {
         pthread_mutex_lock(&request_queue.lock);
-        while (isQueueEmpty(&request_queue)) {
+        while (isQueueEmpty(&request_queue) || request_queue.vip_size > 0) {
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
         }
-        Request req = dequeue(&request_queue);
-        pthread_cond_signal(&request_queue.not_full);
+        Request req = dequeue(&request_queue, 0); 
         pthread_mutex_unlock(&request_queue.lock);
 
         struct timeval dispatch;
@@ -76,16 +92,16 @@ int main(int argc, char* argv[]) {
 
     getargs(&port, &threads, &queue_size, &schedalg, argc, argv);
 
-    // Initialize thread pool and request queue
+    // Initialize request queue
+    initQueue(&request_queue, queue_size);
+
+    // Create worker threads
     pthread_t* worker_threads = malloc(sizeof(pthread_t) * threads);
     if (worker_threads == NULL) {
         fprintf(stderr, "Error: Failed to allocate memory for worker threads\n");
         exit(1);
     }
 
-    initQueue(&request_queue, queue_size);
-
-    // Create worker threads
     for (int i = 0; i < threads; i++) {
         int* thread_id = malloc(sizeof(int));
         if (thread_id == NULL) {
@@ -95,10 +111,17 @@ int main(int argc, char* argv[]) {
         *thread_id = i;
 
         if (pthread_create(&worker_threads[i], NULL, worker_thread, (void*)thread_id) != 0) {
-            fprintf(stderr, "Error: Failed to create thread %d\n", i);
+            fprintf(stderr, "Error: Failed to create worker thread %d\n", i);
             free(thread_id);
             exit(1);
         }
+    }
+
+    // Create VIP thread
+    pthread_t vip_thread_id;
+    if (pthread_create(&vip_thread_id, NULL, vip_thread, NULL) != 0) {
+        fprintf(stderr, "Error: Failed to create VIP thread\n");
+        exit(1);
     }
 
     listenfd = Open_listenfd(port);
@@ -107,46 +130,45 @@ int main(int argc, char* argv[]) {
         clientlen = sizeof(clientaddr);
         connfd = Accept(listenfd, (SA*)&clientaddr, (socklen_t*)&clientlen);
 
-        // Capture the arrival time of the request
+        // Capture arrival time of the request
         struct timeval arrival;
         gettimeofday(&arrival, NULL);
 
+        int is_vip = getRequestType(connfd); // Determine if request is VIP
+
         pthread_mutex_lock(&request_queue.lock);
 
-        // Check if the queue is full and handle according to the scheduling algorithm
+        // Handle Queue Full Case
         if (isQueueFull(&request_queue)) {
             if (strcmp(schedalg, "block") == 0) {
-                // Wait until space is available in the queue
                 while (isQueueFull(&request_queue)) {
                     pthread_cond_wait(&request_queue.not_full, &request_queue.lock);
                 }
             }
             else if (strcmp(schedalg, "dt") == 0) {
-                // Drop the new connection
                 Close(connfd);
                 pthread_mutex_unlock(&request_queue.lock);
                 continue;
             }
             else if (strcmp(schedalg, "dh") == 0) {
-                // Drop the oldest request
-                dequeue(&request_queue);
+                dequeue(&request_queue, 0); // Remove oldest request
             }
             else if (strcmp(schedalg, "random") == 0) {
-                // Randomly drop a request from the queue
                 dropRandomRequest(&request_queue);
             }
         }
 
-        // Add the request to the queue
-        enqueue(&request_queue, (Request) { connfd, arrival });
-        pthread_cond_signal(&request_queue.not_empty);
+        // Add request to the appropriate queue
+        enqueue(&request_queue, (Request) { connfd, arrival }, is_vip);
+
         pthread_mutex_unlock(&request_queue.lock);
     }
 
-    // Clean up resources (not typically reached in a server)
+    // Cleanup (Not usually reached)
     for (int i = 0; i < threads; i++) {
         pthread_join(worker_threads[i], NULL);
     }
+    pthread_join(vip_thread_id, NULL);
     free(worker_threads);
     destroyQueue(&request_queue);
 

@@ -150,6 +150,14 @@ void requestServeDynamic(int fd, char *filename, char *cgiargs, struct timeval a
   	WaitPid(pid, NULL, WUNTRACED);
 }
 
+int getRequestType(int connfd) {
+	char buffer[1024];
+	recv(connfd, buffer, sizeof(buffer), MSG_PEEK);
+	if (strstr(buffer, "REAL") != NULL) {  
+		return 1;
+	}
+	return 0;
+}
 
 void requestServeStatic(int fd, char *filename, int filesize, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
 {

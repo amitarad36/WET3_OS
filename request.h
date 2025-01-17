@@ -15,4 +15,6 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
 //  Returns True/False if realtime event
 int getRequestMetaData(int fd);
 
+int getRequestType(int connfd);
+
 #endif

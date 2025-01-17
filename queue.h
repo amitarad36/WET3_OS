@@ -10,14 +10,17 @@ typedef struct Request {
 } Request;
 
 typedef struct Queue {
-    Request* buffer;
+    Request* buffer;     // Regular queue
+    Request* vip_buffer; // VIP queue
     int capacity;
     int size;
-    int front;
-    int rear;
+    int vip_size;        // Number of VIP requests
+    int front, rear;
+    int vip_front, vip_rear;
     pthread_mutex_t lock;
     pthread_cond_t not_empty;
     pthread_cond_t not_full;
+    pthread_cond_t vip_not_empty; 
 } Queue;
 
 void initQueue(Queue* q, int capacity);

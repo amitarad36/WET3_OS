@@ -17,20 +17,34 @@ void initQueue(Queue* q, int capacity) {
     pthread_cond_init(&q->not_full, NULL);
 }
 
-void enqueue(Queue* q, Request req) {
-    q->rear = (q->rear + 1) % q->capacity;
-    q->buffer[q->rear] = req;
-    q->size++;
+void enqueue(Queue* q, Request req, int is_vip) {
+    if (is_vip) {
+        q->vip_rear = (q->vip_rear + 1) % q->capacity;
+        q->vip_buffer[q->vip_rear] = req;
+        q->vip_size++;
+        pthread_cond_signal(&q->vip_not_empty); 
+    }
+    else {
+        q->rear = (q->rear + 1) % q->capacity;
+        q->buffer[q->rear] = req;
+        q->size++;
+        pthread_cond_signal(&q->not_empty); 
+    }
 }
 
-Request dequeue(Queue* q) {
-    if (q->size == 0) {
-        fprintf(stderr, "Error: Trying to dequeue from an empty queue\n");
-        exit(1);
+
+Request dequeue(Queue* q, int vip) {
+    Request req;
+    if (vip && q->vip_size > 0) { 
+        req = q->vip_buffer[q->vip_front];
+        q->vip_front = (q->vip_front + 1) % q->capacity;
+        q->vip_size--;
     }
-    Request req = q->buffer[q->front];
-    q->front = (q->front + 1) % q->capacity;
-    q->size--;
+    else if (!vip && q->size > 0) {
+        req = q->buffer[q->front];
+        q->front = (q->front + 1) % q->capacity;
+        q->size--;
+    }
     return req;
 }
 
