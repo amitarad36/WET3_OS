@@ -17,6 +17,7 @@ extern pthread_mutex_t stat_lock;
 void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats);
 int getRequestType(int fd);
 int isStaticRequest(int fd);  // Add this line
+void sendHttpResponseWithStats(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats); // Add this line
 
 
 #endif
