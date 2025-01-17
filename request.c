@@ -1,337 +1,195 @@
 //
 // request.c: Does the bulk of the work for the web server.
-// 
+//
 
 #include "segel.h"
 #include "request.h"
 
 pthread_mutex_t stat_lock = PTHREAD_MUTEX_INITIALIZER;
 
-// requestError(      fd,    filename,        "404",    "Not found", "OS-HW3 Server could not find this file");
-void requestError(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
-{
-	char buf[MAXLINE], body[MAXBUF];
+//
+// Handles errors and sends error response to the client
+//
+void requestError(int fd, char* cause, char* errnum, char* shortmsg, char* longmsg, struct timeval arrival, struct timeval dispatch, threads_stats t_stats) {
+    char buf[MAXLINE], body[MAXBUF];
 
-	// Create the body of the error message
-	sprintf(body, "<html><title>OS-HW3 Error</title>");
-	sprintf(body, "%s<body bgcolor=""fffff"">\r\n", body);
-	sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
-	sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
-	sprintf(body, "%s<hr>OS-HW3 Web Server\r\n", body);
+    // Create the body of the error message
+    sprintf(body, "<html><title>OS-HW3 Error</title>");
+    sprintf(body, "%s<body bgcolor=\"ffffff\">\r\n", body);
+    sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
+    sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
+    sprintf(body, "%s<hr>OS-HW3 Web Server\r\n", body);
 
-	// Write out the header information for this response
-	sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
-	Rio_writen(fd, buf, strlen(buf));
-	printf("%s", buf);
+    // Write out the header information for this response
+    sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
+    sprintf(buf, "%sContent-Type: text/html\r\n", buf);
+    sprintf(buf, "%sContent-Length: %lu\r\n", buf, strlen(body));
 
-	sprintf(buf, "Content-Type: text/html\r\n");
-	Rio_writen(fd, buf, strlen(buf));
-	printf("%s", buf);
+    // Add statistics headers
+    sprintf(buf, "%sStat-Req-Arrival:: %lu.%06lu\r\n", buf, arrival.tv_sec, arrival.tv_usec);
+    sprintf(buf, "%sStat-Req-Dispatch:: %lu.%06lu\r\n", buf, dispatch.tv_sec, dispatch.tv_usec);
+    sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, t_stats->id);
+    sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, t_stats->total_req);
+    sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, t_stats->stat_req);
+    sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n\r\n", buf, t_stats->dynm_req);
 
-	sprintf(buf, "Content-Length: %lu\r\n", strlen(body));
-
-
-	sprintf(buf, "%sStat-Req-Arrival:: %lu.%06lu\r\n", buf, arrival.tv_sec, arrival.tv_usec);
-
-	sprintf(buf, "%sStat-Req-Dispatch:: %lu.%06lu\r\n", buf, dispatch.tv_sec, dispatch.tv_usec);
-
-	sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, t_stats->id);
-
-	sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, t_stats->total_req);
-
-	sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, t_stats->stat_req);
-
-	sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n\r\n", buf, t_stats->dynm_req);
-	Rio_writen(fd, buf, strlen(buf));
-	printf("%s", buf);
-	Rio_writen(fd, body, strlen(body));
-	printf("%s", body);
-
+    // Send response
+    Rio_writen(fd, buf, strlen(buf));
+    Rio_writen(fd, body, strlen(body));
 }
 
 //
 // Reads and discards everything up to an empty text line
 //
-void requestReadhdrs(rio_t *rp)
-{
-	char buf[MAXLINE];
-
-	Rio_readlineb(rp, buf, MAXLINE);
-	while (strcmp(buf, "\r\n")) {
-		Rio_readlineb(rp, buf, MAXLINE);
-	}
-	return;
+void requestReadhdrs(rio_t* rp) {
+    char buf[MAXLINE];
+    Rio_readlineb(rp, buf, MAXLINE);
+    while (strcmp(buf, "\r\n")) {
+        Rio_readlineb(rp, buf, MAXLINE);
+    }
 }
 
 //
-// Return 1 if static, 0 if dynamic content
-// Calculates filename (and cgiargs, for dynamic) from uri
+// Determines if the request is static or dynamic
 //
-int requestParseURI(char *uri, char *filename, char *cgiargs)
-{
-	char *ptr;
-	// if (ptr = strstr(uri, "est=")) {
-	// 	char* end_arg; 
-	// 	if (end_arg = strstr(uri, "&"))
-	// 		memmove(ptr, end_arg + 1, strlen(end_arg));
-	// 	else
-	// 		ptr = '\0';
-	// }
-	if (strstr(uri, "..")) {
-		sprintf(filename, "./public/home.html");
-		return 1;
-	}
-	if (!strstr(uri, "cgi")) {
-		// static
-		strcpy(cgiargs, "");
-		sprintf(filename, "./public/%s", uri);
-		if (uri[strlen(uri)-1] == '/') {
-			strcat(filename, "home.html");
-		}
-		return 1;
-	} else {
-		// dynamic
-		ptr = index(uri, '?');
-		if (ptr) {
-			strcpy(cgiargs, ptr+1);
-			*ptr = '\0';
-		} else {
-			strcpy(cgiargs, "");
-		}
-		sprintf(filename, "./public/%s", uri);
-		return 0;
-	}
+int requestParseURI(char* uri, char* filename, char* cgiargs) {
+    char* ptr;
+
+    if (strstr(uri, "..")) {
+        sprintf(filename, "./public/home.html");
+        return 1;  // Static request
+    }
+
+    if (!strstr(uri, "cgi")) {
+        strcpy(cgiargs, "");
+        sprintf(filename, "./public/%s", uri);
+        if (uri[strlen(uri) - 1] == '/') {
+            strcat(filename, "home.html");
+        }
+        return 1;
+    }
+    else {
+        ptr = index(uri, '?');
+        if (ptr) {
+            strcpy(cgiargs, ptr + 1);
+            *ptr = '\0';
+        }
+        else {
+            strcpy(cgiargs, "");
+        }
+        sprintf(filename, "./public/%s", uri);
+        return 0;
+    }
 }
 
 //
-// Fills in the filetype given the filename
+// Determines file type based on filename
 //
-void requestGetFiletype(char *filename, char *filetype)
-{
-	if (strstr(filename, ".html"))
-		strcpy(filetype, "text/html");
-	else if (strstr(filename, ".gif"))
-		strcpy(filetype, "image/gif");
-	else if (strstr(filename, ".jpg"))
-		strcpy(filetype, "image/jpeg");
-	else
-		strcpy(filetype, "text/plain");
+void requestGetFiletype(char* filename, char* filetype) {
+    if (strstr(filename, ".html"))
+        strcpy(filetype, "text/html");
+    else if (strstr(filename, ".gif"))
+        strcpy(filetype, "image/gif");
+    else if (strstr(filename, ".jpg"))
+        strcpy(filetype, "image/jpeg");
+    else
+        strcpy(filetype, "text/plain");
 }
 
-void requestServeDynamic(int fd, char *filename, char *cgiargs, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
-{
-	char buf[MAXLINE], *emptylist[] = {NULL};
+//
+// Serves static content (HTML, images, etc.)
+//
+void requestServeStatic(int fd, char* filename, int filesize, struct timeval arrival, struct timeval dispatch, threads_stats t_stats) {
+    int srcfd;
+    char* srcp, filetype[MAXLINE], buf[MAXBUF];
 
-	// The server does only a little bit of the header.
-	// The CGI script has to finish writing out the header.
-	sprintf(buf, "HTTP/1.0 200 OK\r\n");
-	sprintf(buf, "%sServer: OS-HW3 Web Server\r\n", buf);
+    requestGetFiletype(filename, filetype);
+    srcfd = Open(filename, O_RDONLY, 0);
+    srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+    Close(srcfd);
 
-	sprintf(buf, "%sStat-Req-Arrival:: %lu.%06lu\r\n", buf, arrival.tv_sec, arrival.tv_usec);
+    // Send response headers
+    sprintf(buf, "HTTP/1.0 200 OK\r\n");
+    sprintf(buf, "%sServer: OS-HW3 Web Server\r\n", buf);
+    sprintf(buf, "%sContent-Length: %d\r\n", buf, filesize);
+    sprintf(buf, "%sContent-Type: %s\r\n", buf, filetype);
+    sprintf(buf, "%sStat-Req-Arrival:: %lu.%06lu\r\n", buf, arrival.tv_sec, arrival.tv_usec);
+    sprintf(buf, "%sStat-Req-Dispatch:: %lu.%06lu\r\n", buf, dispatch.tv_sec, dispatch.tv_usec);
+    sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, t_stats->id);
+    sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, t_stats->total_req);
+    sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, t_stats->stat_req);
+    sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n\r\n", buf, t_stats->dynm_req);
 
-	sprintf(buf, "%sStat-Req-Dispatch:: %lu.%06lu\r\n", buf, dispatch.tv_sec, dispatch.tv_usec);
-
-	sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, t_stats->id);
-
-	sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, t_stats->total_req);
-
-	sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, t_stats->stat_req);
-
-	sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n", buf, t_stats->dynm_req);
-
-	Rio_writen(fd, buf, strlen(buf));
-   	int pid = 0;
-   	if ((pid = Fork()) == 0) {
-     	 /* Child process */
-     	 Setenv("QUERY_STRING", cgiargs, 1);
-     	 /* When the CGI process writes to stdout, it will instead go to the socket */
-     	 Dup2(fd, STDOUT_FILENO);
-     	 Execve(filename, emptylist, environ);
-   	}
-  	WaitPid(pid, NULL, WUNTRACED);
+    Rio_writen(fd, buf, strlen(buf));
+    Rio_writen(fd, srcp, filesize);
+    Munmap(srcp, filesize);
 }
 
+//
+// Serves dynamic content (CGI execution)
+//
+void requestServeDynamic(int fd, char* filename, char* cgiargs) {
+    char buf[MAXLINE], * emptylist[] = { NULL };
+
+    sprintf(buf, "HTTP/1.0 200 OK\r\n");
+    sprintf(buf, "%sServer: OS-HW3 Web Server\r\n\r\n", buf);
+    Rio_writen(fd, buf, strlen(buf));
+
+    if (fork() == 0) {
+        setenv("QUERY_STRING", cgiargs, 1);
+        dup2(fd, STDOUT_FILENO);
+        execve(filename, emptylist, environ);
+    }
+    wait(NULL);
+}
+
+//
+// Determines if a request is VIP
+//
 int getRequestType(int fd) {
-	rio_t rio;  // Declare an instance of `rio_t`
-	char buf[MAXLINE];
+    rio_t rio;
+    char buf[MAXLINE];
 
-	Rio_readinitb(&rio, fd);  // Initialize `rio`
-	Rio_readlineb(&rio, buf, MAXLINE);
+    Rio_readinitb(&rio, fd);
+    Rio_readlineb(&rio, buf, MAXLINE);
 
-	if (strstr(buf, "REAL") != NULL) {
-		return 1; // VIP request
-	}
-	return 0; // Regular request
+    return (strstr(buf, "REAL") != NULL) ? 1 : 0;
 }
 
-void requestServeStatic(int fd, char *filename, int filesize, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
-{
-	int srcfd;
-	char *srcp, filetype[MAXLINE], buf[MAXBUF];
-
-	requestGetFiletype(filename, filetype);
-
-	srcfd = Open(filename, O_RDONLY, 0);
-
-	// Rather than call read() to read the file into memory,
-	// which would require that we allocate a buffer, we memory-map the file
-	srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
-	Close(srcfd);
-
-	// put together response
-	sprintf(buf, "HTTP/1.0 200 OK\r\n");
-	sprintf(buf, "%sServer: OS-HW3 Web Server\r\n", buf);
-	sprintf(buf, "%sContent-Length: %d\r\n", buf, filesize);
-	sprintf(buf, "%sContent-Type: %s\r\n", buf, filetype);
-	sprintf(buf, "%sStat-Req-Arrival:: %lu.%06lu\r\n", buf, arrival.tv_sec, arrival.tv_usec);
-
-	sprintf(buf, "%sStat-Req-Dispatch:: %lu.%06lu\r\n", buf, dispatch.tv_sec, dispatch.tv_usec);
-
-	sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, t_stats->id);
-
-	sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, t_stats->total_req);
-
-	sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, t_stats->stat_req);
-
-	sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n\r\n", buf, t_stats->dynm_req);
-
-	Rio_writen(fd, buf, strlen(buf));
-
-	//  Writes out to the client socket the memory-mapped file
-	Rio_writen(fd, srcp, filesize);
-	Munmap(srcp, filesize);
-}
-
-int isStaticRequest(int fd) {
-	rio_t rio;  // Declare a local rio_t instance
-	char buf[MAXLINE];
-
-	Rio_readinitb(&rio, fd);  // Initialize `rio`
-	Rio_readlineb(&rio, buf, MAXLINE);  // Read the request line
-
-	// Check if the request asks for a static file (common extensions)
-	if (strstr(buf, ".html") || strstr(buf, ".jpg") || strstr(buf, ".png") ||
-		strstr(buf, ".css") || strstr(buf, ".js")) {
-		return 1; // Static request
-	}
-	return 0; // Dynamic request
-}
-
-void sendHttpResponseWithStats(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats) {
-	char buf[MAXLINE];
-
-	// Calculate statistics
-	struct timeval processing;
-	gettimeofday(&processing, NULL);
-
-	long dispatch_time = (dispatch.tv_sec - arrival.tv_sec) * 1000000 + (dispatch.tv_usec - arrival.tv_usec);
-	long processing_time = (processing.tv_sec - dispatch.tv_sec) * 1000000 + (processing.tv_usec - dispatch.tv_usec);
-
-	// Construct the HTTP response headers
-	sprintf(buf, "HTTP/1.1 200 OK\r\n");
-	sprintf(buf, "%sServer: My Web Server\r\n", buf);
-	sprintf(buf, "%sContent-length: %d\r\n", buf, 0); // Placeholder for content length
-	sprintf(buf, "%sContent-type: text/plain\r\n", buf);
-
-	// Add usage statistics in the HTTP headers
-	sprintf(buf, "%sX-Request-Dispatch-Time: %ld us\r\n", buf, dispatch_time);
-	sprintf(buf, "%sX-Request-Processing-Time: %ld us\r\n", buf, processing_time);
-	sprintf(buf, "%sX-Thread-ID: %d\r\n", buf, t_stats->id);
-	sprintf(buf, "%sX-Thread-Requests: %d\r\n", buf, t_stats->total_req);
-	sprintf(buf, "%sX-Thread-Static: %d\r\n", buf, t_stats->stat_req);
-	sprintf(buf, "%sX-Thread-Dynamic: %d\r\n\r\n", buf, t_stats->dynm_req);
-
-	// Send headers to client
-	Rio_writen(fd, buf, strlen(buf));
-}
-
-void serveRequest(int fd) {
-	char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
-
-	// Read request line
-	Rio_readlineb(&rio, buf, MAXLINE);
-	sscanf(buf, "%s %s %s", method, uri, version);
-
-	// Only support GET requests
-	if (strcasecmp(method, "GET") != 0) {
-		requestError(fd, method, "501", "Not Implemented", "Server does not support this method");
-		return;
-	}
-
-	// Determine if request is static or dynamic
-	int is_static = isStaticRequest(fd);
-
-	if (is_static) {
-		requestServeStatic(fd, uri);
-	}
-	else {
-		requestServeDynamic(fd, uri);
-	}
-}
-
-void requestServeStatic(int fd, char* filename) {
-	struct stat sbuf;
-
-	if (stat(filename, &sbuf) < 0) {
-		requestError(fd, filename, "404", "Not Found", "File not found");
-		return;
-	}
-
-	int srcfd = open(filename, O_RDONLY, 0);
-	char* srcp = malloc(sbuf.st_size);
-	read(srcfd, srcp, sbuf.st_size);
-	close(srcfd);
-
-	// Send response headers
-	char buf[MAXLINE];
-	sprintf(buf, "HTTP/1.1 200 OK\r\n");
-	sprintf(buf, "%sServer: My Web Server\r\n", buf);
-	sprintf(buf, "%sContent-Length: %ld\r\n", buf, sbuf.st_size);
-	sprintf(buf, "%sContent-Type: text/html\r\n\r\n", buf);
-	Rio_writen(fd, buf, strlen(buf));
-
-	// Send response body
-	Rio_writen(fd, srcp, sbuf.st_size);
-	free(srcp);
-}
-
-void requestServeDynamic(int fd, char* cgi_script) {
-	char buf[MAXLINE];
-
-	// Send initial response headers
-	sprintf(buf, "HTTP/1.1 200 OK\r\n");
-	sprintf(buf, "%sServer: My Web Server\r\n\r\n", buf);
-	Rio_writen(fd, buf, strlen(buf));
-
-	// Execute the CGI script
-	if (fork() == 0) {
-		dup2(fd, STDOUT_FILENO);
-		execl(cgi_script, cgi_script, NULL);
-	}
-	wait(NULL);
-}
-
-// handle a request
+//
+// Handles HTTP requests, updates statistics, and serves content
+//
 void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats) {
-	if (t_stats == NULL) {
-		fprintf(stderr, "Error: Received NULL thread stats\n");
-		return;
-	}
+    if (t_stats == NULL) {
+        fprintf(stderr, "Error: Received NULL thread stats\n");
+        return;
+    }
 
-	// Lock before modifying thread statistics
-	pthread_mutex_lock(&stat_lock);
-	t_stats->total_req++;
-	if (isStaticRequest(fd)) {
-		t_stats->stat_req++;
-	}
-	else {
-		t_stats->dynm_req++;
-	}
-	pthread_mutex_unlock(&stat_lock);
+    // Lock before modifying thread statistics
+    pthread_mutex_lock(&stat_lock);
+    t_stats->total_req++;
+    if (isStaticRequest(fd)) {
+        t_stats->stat_req++;
+    }
+    else {
+        t_stats->dynm_req++;
+    }
+    pthread_mutex_unlock(&stat_lock);
 
-	// Send response with statistics in headers
-	sendHttpResponseWithStats(fd, arrival, dispatch, t_stats);
+    // Serve the request
+    char filename[MAXLINE], cgiargs[MAXLINE];
+    int is_static = requestParseURI(uri, filename, cgiargs);
 
-	// Process request (serve static/dynamic content)
-	serveRequest(fd);
+    struct stat sbuf;
+    if (stat(filename, &sbuf) < 0) {
+        requestError(fd, filename, "404", "Not Found", "File not found", arrival, dispatch, t_stats);
+        return;
+    }
+
+    if (is_static) {
+        requestServeStatic(fd, filename, sbuf.st_size, arrival, dispatch, t_stats);
+    }
+    else {
+        requestServeDynamic(fd, filename, cgiargs);
+    }
 }
