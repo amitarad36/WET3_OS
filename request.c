@@ -151,7 +151,10 @@ void requestServeDynamic(int fd, char *filename, char *cgiargs, struct timeval a
 }
 
 int getRequestType(int fd) {
+	rio_t rio;  // Declare an instance of `rio_t`
 	char buf[MAXLINE];
+
+	Rio_readinitb(&rio, fd);  // Initialize `rio`
 	Rio_readlineb(&rio, buf, MAXLINE);
 
 	if (strstr(buf, "REAL") != NULL) {
@@ -159,6 +162,7 @@ int getRequestType(int fd) {
 	}
 	return 0; // Regular request
 }
+
 
 void requestServeStatic(int fd, char *filename, int filesize, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
 {
