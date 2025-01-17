@@ -32,7 +32,6 @@ void enqueue(Queue* q, Request req, int is_vip) {
     }
 }
 
-
 Request dequeue(Queue* q, int vip) {
     Request req;
     if (vip && q->vip_size > 0) { 
@@ -47,7 +46,6 @@ Request dequeue(Queue* q, int vip) {
     }
     return req;
 }
-
 
 int isQueueFull(Queue* q) {
     return q->size == q->capacity;
