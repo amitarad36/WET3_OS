@@ -130,35 +130,52 @@ int main(int argc, char* argv[]) {
         clientlen = sizeof(clientaddr);
         connfd = Accept(listenfd, (SA*)&clientaddr, (socklen_t*)&clientlen);
 
-        // Capture arrival time of the request
+        // Capture the arrival time of the request
         struct timeval arrival;
         gettimeofday(&arrival, NULL);
 
-        int is_vip = getRequestType(connfd); // Determine if request is VIP
+        int is_vip = getRequestType(connfd); // Check if request is VIP
 
         pthread_mutex_lock(&request_queue.lock);
 
-        // Handle Queue Full Case
+        // If the queue is full, apply the appropriate overload policy
         if (isQueueFull(&request_queue)) {
-            if (strcmp(schedalg, "block") == 0) {
+            if (is_vip) {
+                // VIP requests always block until a slot is available
                 while (isQueueFull(&request_queue)) {
                     pthread_cond_wait(&request_queue.not_full, &request_queue.lock);
                 }
             }
-            else if (strcmp(schedalg, "dt") == 0) {
-                Close(connfd);
-                pthread_mutex_unlock(&request_queue.lock);
-                continue;
-            }
-            else if (strcmp(schedalg, "dh") == 0) {
-                dequeue(&request_queue, 0); // Remove oldest request
-            }
-            else if (strcmp(schedalg, "random") == 0) {
-                dropRandomRequest(&request_queue);
+            else {
+                // Apply the specified overload policy for regular requests
+                if (strcmp(schedalg, "block") == 0) {
+                    while (isQueueFull(&request_queue)) {
+                        pthread_cond_wait(&request_queue.not_full, &request_queue.lock);
+                    }
+                }
+                else if (strcmp(schedalg, "dt") == 0) { // Drop Tail
+                    Close(connfd);
+                    pthread_mutex_unlock(&request_queue.lock);
+                    continue;
+                }
+                else if (strcmp(schedalg, "dh") == 0) { // Drop Head
+                    dequeue(&request_queue, 0); // Remove the oldest request
+                }
+                else if (strcmp(schedalg, "block_flush") == 0) { // Bonus Policy
+                    while (request_queue.size > 0) {
+                        pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
+                    }
+                    Close(connfd);
+                    pthread_mutex_unlock(&request_queue.lock);
+                    continue;
+                }
+                else if (strcmp(schedalg, "drop_random") == 0) { // Bonus Policy
+                    dropRandomRequests(&request_queue, 50); // Drop 50% of regular requests
+                }
             }
         }
 
-        // Add request to the appropriate queue
+        // Add the request to the appropriate queue
         enqueue(&request_queue, (Request) { connfd, arrival }, is_vip);
 
         pthread_mutex_unlock(&request_queue.lock);

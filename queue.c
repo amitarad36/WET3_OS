@@ -32,17 +32,21 @@ void enqueue(Queue* q, Request req, int is_vip) {
     }
 }
 
-Request dequeue(Queue* q, int vip) {
+Request dequeue(Queue* q, int is_vip) {
     Request req;
-    if (vip && q->vip_size > 0) { 
+    if (is_vip && q->vip_size > 0) {
         req = q->vip_buffer[q->vip_front];
         q->vip_front = (q->vip_front + 1) % q->capacity;
         q->vip_size--;
     }
-    else if (!vip && q->size > 0) {
+    else if (!is_vip && q->size > 0) {
         req = q->buffer[q->front];
         q->front = (q->front + 1) % q->capacity;
         q->size--;
+    }
+    else {
+        fprintf(stderr, "Error: Attempt to dequeue from an empty queue\n");
+        exit(1);
     }
     return req;
 }
@@ -65,13 +69,16 @@ void destroyQueue(Queue* q) {
 
 #include <time.h>
 
-void dropRandomRequest(Queue* q) {
-    if (q->size == 0) return;
-
-    int random_index = rand() % q->size;
-    for (int i = random_index; i < q->size - 1; i++) {
-        q->buffer[i] = q->buffer[i + 1];
+void dropRandomRequests(Queue* q, int percentage) {
+    int to_remove = (q->size * percentage) / 100; // Calculate how many requests to drop
+    for (int i = 0; i < to_remove; i++) {
+        int rand_index = (q->front + rand() % q->size) % q->capacity;
+        for (int j = rand_index; j != q->rear; j = (j + 1) % q->capacity) {
+            q->buffer[j] = q->buffer[(j + 1) % q->capacity]; // Shift elements left
+        }
+        q->rear = (q->rear - 1 + q->capacity) % q->capacity;
+        q->size--;
     }
-    q->size--;
 }
+
 

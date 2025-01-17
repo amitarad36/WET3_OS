@@ -28,7 +28,7 @@ void enqueue(Queue* q, Request req, int is_vip);
 Request dequeue(Queue* q, int vip);
 int isQueueEmpty(Queue* q);
 int isQueueFull(Queue* q);
-void dropRandomRequest(Queue* q);
+void dropRandomRequests(Queue* q, int percentage);
 void destroyQueue(Queue* q);
 
 #endif
