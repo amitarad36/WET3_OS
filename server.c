@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
     }
 
     for (int i = 0; i < threads; i++) {
-        threads_stats t_stats = malloc(sizeof(struct Threads_stats));
+        threads_stats t_stats = malloc(sizeof(struct Threads_stats)); // Correct: Allocates space for struct
         if (t_stats == NULL) {
             fprintf(stderr, "Error: Failed to allocate memory for thread stats\n");
             exit(1);
