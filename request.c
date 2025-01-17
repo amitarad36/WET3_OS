@@ -173,8 +173,14 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
         return;
     }
 
-    // Read request headers
+    // Declare `rio_t` instance
+    rio_t rio;
     char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
+
+    // Initialize `rio`
+    Rio_readinitb(&rio, fd);
+
+    // Read request line
     Rio_readlineb(&rio, buf, MAXLINE);
     sscanf(buf, "%s %s %s", method, uri, version);
 
