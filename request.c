@@ -143,6 +143,14 @@ void requestServeDynamic(int fd, char* filename, char* cgiargs) {
     wait(NULL);
 }
 
+int isStaticRequest(char* uri) {
+    if (strstr(uri, ".html") || strstr(uri, ".jpg") || strstr(uri, ".png") ||
+        strstr(uri, ".gif") || strstr(uri, ".css") || strstr(uri, ".js")) {
+        return 1; // Static request
+    }
+    return 0; // Dynamic request
+}
+
 //
 // Determines if a request is VIP
 //
@@ -165,20 +173,21 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
         return;
     }
 
-    // Lock before modifying thread statistics
-    pthread_mutex_lock(&stat_lock);
-    t_stats->total_req++;
-    if (isStaticRequest(fd)) {
-        t_stats->stat_req++;
-    }
-    else {
-        t_stats->dynm_req++;
-    }
-    pthread_mutex_unlock(&stat_lock);
+    // Read request headers
+    char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
+    Rio_readlineb(&rio, buf, MAXLINE);
+    sscanf(buf, "%s %s %s", method, uri, version);
 
-    // Serve the request
+    // Only support GET requests
+    if (strcasecmp(method, "GET") != 0) {
+        requestError(fd, method, "501", "Not Implemented", "Server does not support this method", arrival, dispatch, t_stats);
+        return;
+    }
+
+    // Determine if the request is static or dynamic
     char filename[MAXLINE], cgiargs[MAXLINE];
-    int is_static = requestParseURI(uri, filename, cgiargs);
+    int is_static = isStaticRequest(uri);
+    requestParseURI(uri, filename, cgiargs);
 
     struct stat sbuf;
     if (stat(filename, &sbuf) < 0) {
@@ -186,6 +195,18 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
         return;
     }
 
+    // Lock statistics update
+    pthread_mutex_lock(&stat_lock);
+    t_stats->total_req++;
+    if (is_static) {
+        t_stats->stat_req++;
+    }
+    else {
+        t_stats->dynm_req++;
+    }
+    pthread_mutex_unlock(&stat_lock);
+
+    // Serve request
     if (is_static) {
         requestServeStatic(fd, filename, sbuf.st_size, arrival, dispatch, t_stats);
     }

@@ -14,11 +14,13 @@ typedef struct Threads_stats{
 // Global mutex for statistics
 extern pthread_mutex_t stat_lock;
 
+void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats);
 int getRequestType(int fd);
 int requestParseURI(char* uri, char* filename, char* cgiargs);
 void requestServeStatic(int fd, char* filename, int filesize, struct timeval arrival, struct timeval dispatch, threads_stats t_stats);
 void requestServeDynamic(int fd, char* filename, char* cgiargs);
 void requestError(int fd, char* cause, char* errnum, char* shortmsg, char* longmsg, struct timeval arrival, struct timeval dispatch, threads_stats t_stats);
-void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats);
+int isStaticRequest(char* uri);  // Add this line
+
 
 #endif
