@@ -3,7 +3,6 @@
 
 #include <pthread.h>
 
-
 typedef struct Threads_stats{
 	int id;
 	int stat_req;
@@ -21,6 +20,5 @@ void requestServeStatic(int fd, char* filename, int filesize, struct timeval arr
 void requestServeDynamic(int fd, char* filename, char* cgiargs);
 void requestError(int fd, char* cause, char* errnum, char* shortmsg, char* longmsg, struct timeval arrival, struct timeval dispatch, threads_stats t_stats);
 int isStaticRequest(char* uri);  // Add this line
-
 
 #endif

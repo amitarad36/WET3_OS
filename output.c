@@ -3,7 +3,6 @@
 #include <assert.h>
 #include <unistd.h>
 
-
 //
 // This program is intended to help you test your web server.
 // You can use it to test that you are correctly having multiple threads
@@ -32,7 +31,6 @@ double Time_GetSeconds() {
     assert(rc == 0);
     return (double) ((double)t.tv_sec + (double)t.tv_usec / 1e6);
 }
-
 
 int main(int argc, char *argv[])
 {
