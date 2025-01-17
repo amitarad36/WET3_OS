@@ -206,11 +206,15 @@ void requestServeStatic(int fd, char *filename, int filesize, struct timeval arr
 }
 
 int isStaticRequest(int fd) {
+	rio_t rio;  // Declare a local rio_t instance
 	char buf[MAXLINE];
-	Rio_readlineb(&rio, buf, MAXLINE);  // Read request line
 
-	// Check if the request asks for a static file (no CGI execution)
-	if (strstr(buf, ".html") || strstr(buf, ".jpg") || strstr(buf, ".png") || strstr(buf, ".css") || strstr(buf, ".js")) {
+	Rio_readinitb(&rio, fd);  // Initialize `rio`
+	Rio_readlineb(&rio, buf, MAXLINE);  // Read the request line
+
+	// Check if the request asks for a static file (common extensions)
+	if (strstr(buf, ".html") || strstr(buf, ".jpg") || strstr(buf, ".png") ||
+		strstr(buf, ".css") || strstr(buf, ".js")) {
 		return 1; // Static request
 	}
 	return 0; // Dynamic request
