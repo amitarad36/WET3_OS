@@ -150,13 +150,14 @@ void requestServeDynamic(int fd, char *filename, char *cgiargs, struct timeval a
   	WaitPid(pid, NULL, WUNTRACED);
 }
 
-int getRequestType(int connfd) {
-	char buffer[1024];
-	recv(connfd, buffer, sizeof(buffer), MSG_PEEK);
-	if (strstr(buffer, "REAL") != NULL) {  
-		return 1;
+int getRequestType(int fd) {
+	char buf[MAXLINE];
+	Rio_readlineb(&rio, buf, MAXLINE);
+
+	if (strstr(buf, "REAL") != NULL) {
+		return 1; // VIP request
 	}
-	return 0;
+	return 0; // Regular request
 }
 
 void requestServeStatic(int fd, char *filename, int filesize, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
@@ -213,44 +214,44 @@ int getRequestMetaData(int fd /*, int* est* for future use ignore this*/)
 
 
 // handle a request
-void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
-{
-	int is_static;
-	struct stat sbuf;
-	char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
-	char filename[MAXLINE], cgiargs[MAXLINE];
-	rio_t rio;
+void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats* t_stats) {
+	char buf[MAXLINE], body[MAXBUF];
 
-	Rio_readinitb(&rio, fd);
-	Rio_readlineb(&rio, buf, MAXLINE);
-	sscanf(buf, "%s %s %s", method, uri, version);
+	// Calculate time statistics
+	struct timeval processing;
+	gettimeofday(&processing, NULL);
 
-	if (strcasecmp(method, "GET") && strcasecmp(method, "REAL")) {
-		requestError(fd, method, "501", "Not Implemented", "OS-HW3 Server does not implement this method", arrival, dispatch, t_stats);
-		return;
+	long dispatch_time = (dispatch.tv_sec - arrival.tv_sec) * 1000000 + (dispatch.tv_usec - arrival.tv_usec);
+	long processing_time = (processing.tv_sec - dispatch.tv_sec) * 1000000 + (processing.tv_usec - dispatch.tv_usec);
+
+	// Update thread statistics
+	pthread_mutex_lock(&stats_lock);
+	t_stats->total_req++;
+	if (isStaticRequest(fd)) {
+		t_stats->stat_req++;
 	}
-
-	requestReadhdrs(&rio);
-
-	is_static = requestParseURI(uri, filename, cgiargs);
-	if (stat(filename, &sbuf) < 0) {
-		requestError(fd, filename, "404", "Not found", "OS-HW3 Server could not find this file", arrival, dispatch, t_stats);
-		return;
+	else {
+		t_stats->dynm_req++;
 	}
+	pthread_mutex_unlock(&stats_lock);
 
-	if (is_static) {
-		if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
-			requestError(fd, filename, "403", "Forbidden", "OS-HW3 Server could not read this file", arrival, dispatch, t_stats);
-			return;
-		}
-		(t_stats->stat_req)++;
-		requestServeStatic(fd, filename, sbuf.st_size, arrival, dispatch, t_stats);
-	} else {
-		if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
-			requestError(fd, filename, "403", "Forbidden", "OS-HW3 Server could not run this CGI program", arrival, dispatch, t_stats);
-			return;
-		}
-		(t_stats->dynm_req)++;
-		requestServeDynamic(fd, filename, cgiargs, arrival, dispatch, t_stats);
-	}
+	// Construct the HTTP response headers
+	sprintf(buf, "HTTP/1.1 200 OK\r\n");
+	sprintf(buf, "%sServer: My Web Server\r\n", buf);
+	sprintf(buf, "%sContent-length: %d\r\n", buf, content_length);
+	sprintf(buf, "%sContent-type: %s\r\n", buf, content_type);
+
+	// Add usage statistics in the HTTP headers
+	sprintf(buf, "%sX-Request-Dispatch-Time: %ld us\r\n", buf, dispatch_time);
+	sprintf(buf, "%sX-Request-Processing-Time: %ld us\r\n", buf, processing_time);
+	sprintf(buf, "%sX-Thread-ID: %d\r\n", buf, t_stats->id);
+	sprintf(buf, "%sX-Thread-Requests: %d\r\n", buf, t_stats->total_req);
+	sprintf(buf, "%sX-Thread-Static: %d\r\n", buf, t_stats->stat_req);
+	sprintf(buf, "%sX-Thread-Dynamic: %d\r\n\r\n", buf, t_stats->dynm_req);
+
+	// Send headers to client
+	Rio_writen(fd, buf, strlen(buf));
+
+	// Process and send the requested file
+	serveRequest(fd);
 }

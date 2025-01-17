@@ -33,6 +33,8 @@ void enqueue(Queue* q, Request req, int is_vip) {
 }
 
 Request dequeue(Queue* q, int is_vip) {
+    pthread_mutex_lock(&q->lock);
+
     Request req;
     if (is_vip && q->vip_size > 0) {
         req = q->vip_buffer[q->vip_front];
@@ -48,6 +50,8 @@ Request dequeue(Queue* q, int is_vip) {
         fprintf(stderr, "Error: Attempt to dequeue from an empty queue\n");
         exit(1);
     }
+
+    pthread_mutex_unlock(&q->lock);
     return req;
 }
 
@@ -70,7 +74,7 @@ void destroyQueue(Queue* q) {
 #include <time.h>
 
 void dropRandomRequests(Queue* q, int percentage) {
-    int to_remove = (q->size * percentage) / 100; // Calculate how many requests to drop
+    int to_remove = (q->size * percentage) / 100; // Calculate how many to drop
     for (int i = 0; i < to_remove; i++) {
         int rand_index = (q->front + rand() % q->size) % q->capacity;
         for (int j = rand_index; j != q->rear; j = (j + 1) % q->capacity) {

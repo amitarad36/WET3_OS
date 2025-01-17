@@ -18,20 +18,33 @@
 Queue request_queue;
 
 void* vip_thread(void* arg) {
+    // Allocate a threads_stats struct for the VIP thread
+    threads_stats t_stats = malloc(sizeof(struct Threads_stats));
+    if (t_stats == NULL) {
+        fprintf(stderr, "Error: Failed to allocate memory for VIP thread stats\n");
+        pthread_exit(NULL);
+    }
+    t_stats->id = -1;  // Use -1 to indicate VIP thread
+    t_stats->stat_req = 0;
+    t_stats->dynm_req = 0;
+    t_stats->total_req = 0;
+
     while (1) {
         pthread_mutex_lock(&request_queue.lock);
         while (isQueueEmpty(&request_queue) || request_queue.vip_size == 0) {
             pthread_cond_wait(&request_queue.vip_not_empty, &request_queue.lock);
         }
-        Request req = dequeue(&request_queue, 1); 
+        Request req = dequeue(&request_queue, 1); // VIP queue
         pthread_mutex_unlock(&request_queue.lock);
 
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
 
-        requestHandle(req.connfd, req.arrival, dispatch, NULL);
+        requestHandle(req.connfd, req.arrival, dispatch, t_stats);
         Close(req.connfd);
     }
+
+    free(t_stats); // Should never reach here
 }
 
 void getargs(int* port, int* threads, int* queue_size, char** schedalg, int argc, char* argv[]) {
@@ -46,28 +59,14 @@ void getargs(int* port, int* threads, int* queue_size, char** schedalg, int argc
 }
 
 void* worker_thread(void* arg) {
-    int thread_id = *((int*)arg); // Get thread index
-    free(arg); // Free dynamically allocated thread ID
-
-    // Allocate memory for thread stats
-    threads_stats t_stats = malloc(sizeof(threads_stats));
-    if (t_stats == NULL) {
-        fprintf(stderr, "Error: Failed to allocate memory for thread stats\n");
-        pthread_exit(NULL);
-    }
-
-    // Initialize thread statistics
-    t_stats->id = thread_id;
-    t_stats->stat_req = 0;
-    t_stats->dynm_req = 0;
-    t_stats->total_req = 0;
+    threads_stats* t_stats = (threads_stats*)arg;
 
     while (1) {
         pthread_mutex_lock(&request_queue.lock);
         while (isQueueEmpty(&request_queue) || request_queue.vip_size > 0) {
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
         }
-        Request req = dequeue(&request_queue, 0); 
+        Request req = dequeue(&request_queue, 0); // Regular queue
         pthread_mutex_unlock(&request_queue.lock);
 
         struct timeval dispatch;
@@ -77,9 +76,7 @@ void* worker_thread(void* arg) {
         Close(req.connfd);
     }
 
-    // Free memory before exiting (not usually reached)
-    free(t_stats);
-    pthread_exit(NULL);
+    free(t_stats); // Should never reach here
 }
 
 int main(int argc, char* argv[]) {
@@ -103,19 +100,23 @@ int main(int argc, char* argv[]) {
     }
 
     for (int i = 0; i < threads; i++) {
-        int* thread_id = malloc(sizeof(int));
-        if (thread_id == NULL) {
-            fprintf(stderr, "Error: Failed to allocate memory for thread ID\n");
+        threads_stats t_stats = malloc(sizeof(struct Threads_stats));
+        if (t_stats == NULL) {
+            fprintf(stderr, "Error: Failed to allocate memory for thread stats\n");
             exit(1);
         }
-        *thread_id = i;
+        t_stats->id = i;
+        t_stats->stat_req = 0;
+        t_stats->dynm_req = 0;
+        t_stats->total_req = 0;
 
-        if (pthread_create(&worker_threads[i], NULL, worker_thread, (void*)thread_id) != 0) {
+        if (pthread_create(&worker_threads[i], NULL, worker_thread, (void*)t_stats) != 0) {
             fprintf(stderr, "Error: Failed to create worker thread %d\n", i);
-            free(thread_id);
+            free(t_stats);
             exit(1);
         }
     }
+
 
     // Create VIP thread
     pthread_t vip_thread_id;
