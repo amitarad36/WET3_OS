@@ -63,26 +63,30 @@ void* worker_thread(void* arg) {
     while (1) {
         pthread_mutex_lock(&request_queue.lock);
 
-        // Wait for available requests (either VIP or regular)
+        // **Wait until a request is available**
         while (isQueueEmpty(&request_queue)) {
+            printf("Worker thread %d: Sleeping (queue empty)...\n", t_stats->id);
+            fflush(stdout);
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
         }
 
-        // Retrieve a request from the queue
-        Request req = dequeue(&request_queue, 0); // Regular queue
+        printf("Worker thread %d: Woke up! Checking queue...\n", t_stats->id);
+        fflush(stdout);
+
+        // **Dequeue a request**
+        Request req = dequeue(&request_queue, 0);  // Regular request
+
         pthread_mutex_unlock(&request_queue.lock);
 
-        // Ensure we have a valid request
         if (req.connfd == -1) {
-            continue;  // Ignore invalid request
+            continue;
         }
 
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
 
-        // Handle the request
+        // **Handle the request**
         requestHandle(req.connfd, req.arrival, dispatch, t_stats);
-
         Close(req.connfd);
     }
 }
