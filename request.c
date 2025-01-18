@@ -44,15 +44,18 @@ void requestError(int fd, char* cause, char* errnum, char* shortmsg, char* longm
 void requestReadhdrs(rio_t* rp) {
     char buf[MAXLINE];
 
-    printf("Reading headers...\n"); fflush(stdout);
+    printf("Reading headers...\n"); // Debug print
+    fflush(stdout);
 
     Rio_readlineb(rp, buf, MAXLINE);
     while (strcmp(buf, "\r\n")) {
-        printf("Header: %s", buf); fflush(stdout);  // Debug: Print each header
+        printf("Header: %s", buf);  // Debug: Print headers received
+        fflush(stdout);
         Rio_readlineb(rp, buf, MAXLINE);
     }
 
-    printf("Finished reading headers.\n"); fflush(stdout);
+    printf("Finished reading headers.\n"); // Debug print
+    fflush(stdout);
 }
 
 //
