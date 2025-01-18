@@ -19,9 +19,11 @@ void initQueue(Queue* q, int capacity) {
 
 void enqueue(Queue* q, Request req, int is_vip) {
     pthread_mutex_lock(&q->lock);
+    printf("Inside enqueue() function (fd=%d)\n", req.connfd);
+    fflush(stdout);
 
     if (isQueueFull(q)) {
-        printf("Queue is full! Request rejected.\n");
+        printf("Queue is full! Dropping request (fd=%d)\n", req.connfd);
         fflush(stdout);
     }
     else {
@@ -29,7 +31,7 @@ void enqueue(Queue* q, Request req, int is_vip) {
             q->vip_buffer[q->vip_rear] = req;
             q->vip_rear = (q->vip_rear + 1) % q->capacity;
             q->vip_size++;
-            printf("VIP request enqueued. Queue size: %d\n", q->vip_size);
+            printf("VIP request enqueued. VIP Queue size: %d\n", q->vip_size);
         }
         else {
             q->buffer[q->rear] = req;
@@ -42,6 +44,7 @@ void enqueue(Queue* q, Request req, int is_vip) {
 
     pthread_mutex_unlock(&q->lock);
 }
+
 
 Request dequeue(Queue* q, int is_vip) {
     pthread_mutex_lock(&q->lock);
