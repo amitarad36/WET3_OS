@@ -64,27 +64,37 @@ void* worker_thread(void* arg) {
     fflush(stdout);
 
     while (1) {
+        printf("Worker thread %d: waiting for a request...\n", t_stats->id);
+        fflush(stdout);
+
         pthread_mutex_lock(&request_queue.lock);
 
+        // Wait for a request to be available
         while (isQueueEmpty(&request_queue) || request_queue.vip_size > 0) {
-            printf("Worker thread %d sleeping, waiting for a request...\n", t_stats->id);
+            printf("Worker thread %d: sleeping (queue empty or VIP requests pending)...\n", t_stats->id);
             fflush(stdout);
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
-            printf("Worker thread %d: waiting for a request...\n", t_stats->id);
         }
 
-        Request req = dequeue(&request_queue, 0);
+        printf("Worker thread %d: Woke up! Checking queue...\n", t_stats->id);
+        fflush(stdout);
+
+        Request req = dequeue(&request_queue, 0); // Regular queue
         pthread_mutex_unlock(&request_queue.lock);
 
-        printf("Worker thread %d processing request (fd=%d)\n", t_stats->id, req.connfd);
+        printf("Worker thread %d: dequeued request (fd=%d)\n", t_stats->id, req.connfd);
         fflush(stdout);
 
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
 
+        // Ensure requestHandle() is actually being called
+        printf("Worker thread %d: Handling request (fd=%d)\n", t_stats->id, req.connfd);
+        fflush(stdout);
+
         requestHandle(req.connfd, req.arrival, dispatch, t_stats);
 
-        printf("Worker thread %d finished processing request (fd=%d)\n", t_stats->id, req.connfd);
+        printf("Worker thread %d: Finished handling request (fd=%d), closing connection.\n", t_stats->id, req.connfd);
         fflush(stdout);
 
         Close(req.connfd);
