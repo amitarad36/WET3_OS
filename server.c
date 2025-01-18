@@ -63,15 +63,17 @@ void* worker_thread(void* arg) {
     while (1) {
         pthread_mutex_lock(&request_queue.lock);
 
-        // Wait until there is a request in the queue
+        // **Wait until a request is available**
         while (isQueueEmpty(&request_queue)) {
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
         }
 
-        // Get the request from the queue
+        // **Dequeue request**
         Request req = dequeue(&request_queue, 0);
+
         pthread_mutex_unlock(&request_queue.lock);
 
+        // **Ensure we have a valid request**
         if (req.connfd == -1) {
             continue;
         }
@@ -79,7 +81,7 @@ void* worker_thread(void* arg) {
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
 
-        // Handle the request
+        // **Process the request**
         requestHandle(req.connfd, req.arrival, dispatch, t_stats);
         Close(req.connfd);
     }
