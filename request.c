@@ -113,11 +113,19 @@ void requestServeStatic(int fd, char* filename, int filesize, struct timeval arr
     char* srcp, filetype[MAXLINE], buf[MAXBUF];
 
     requestGetFiletype(filename, filetype);
+
+    // **Check if file exists**
     srcfd = Open(filename, O_RDONLY, 0);
+    if (srcfd < 0) {
+        requestError(fd, filename, "404", "Not Found", "File not found", arrival, dispatch, t_stats);
+        return;
+    }
+
+    // **Memory-map the file for fast serving**
     srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
     Close(srcfd);
 
-    // Send response headers
+    // **Send Response Headers**
     sprintf(buf, "HTTP/1.0 200 OK\r\n");
     sprintf(buf, "%sServer: OS-HW3 Web Server\r\n", buf);
     sprintf(buf, "%sContent-Length: %d\r\n", buf, filesize);
@@ -130,8 +138,13 @@ void requestServeStatic(int fd, char* filename, int filesize, struct timeval arr
     sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n\r\n", buf, t_stats->dynm_req);
 
     Rio_writen(fd, buf, strlen(buf));
+
+    // **Send the file content**
     Rio_writen(fd, srcp, filesize);
     Munmap(srcp, filesize);
+
+    printf("Static file served successfully: %s\n", filename);
+    fflush(stdout);
 }
 
 //
@@ -182,7 +195,6 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
         return;
     }
 
-    // Declare `rio_t` instance
     rio_t rio;
     char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
 
@@ -196,16 +208,22 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
     }
     sscanf(buf, "%s %s %s", method, uri, version);
 
+    // Debug print for received request
+    printf("Received request: %s %s %s\n", method, uri, version);
+    fflush(stdout);
+
     // Only support GET requests
     if (strcasecmp(method, "GET") != 0) {
         requestError(fd, method, "501", "Not Implemented", "Server does not support this method", arrival, dispatch, t_stats);
         return;
     }
 
-    // Read HTTP request headers
+    // **READ HEADERS BEFORE PROCESSING REQUEST**
     requestReadhdrs(&rio);
+    printf("Finished reading headers.\n");
+    fflush(stdout);
 
-    // Determine if the request is static or dynamic
+    // Parse URI and determine file path
     char filename[MAXLINE], cgiargs[MAXLINE];
     int is_static = isStaticRequest(uri);
     requestParseURI(uri, filename, cgiargs);
@@ -227,6 +245,10 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
     }
     pthread_mutex_unlock(&stat_lock);
 
+    // **DEBUG: Confirm if request is static or dynamic**
+    printf("Request type: %s\n", is_static ? "STATIC" : "DYNAMIC");
+    fflush(stdout);
+
     // Serve request
     if (is_static) {
         requestServeStatic(fd, filename, sbuf.st_size, arrival, dispatch, t_stats);
@@ -234,4 +256,7 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
     else {
         requestServeDynamic(fd, filename, cgiargs);
     }
+
+    printf("Response sent successfully!\n");
+    fflush(stdout);
 }
