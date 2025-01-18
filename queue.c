@@ -18,7 +18,6 @@ void initQueue(Queue* q, int capacity) {
 }
 
 void enqueue(Queue* q, Request req, int is_vip) {
-    printf("Inside enqueue()");
     pthread_mutex_lock(&q->lock);
     printf("Inside enqueue() function (fd=%d)\n", req.connfd);
     fflush(stdout);

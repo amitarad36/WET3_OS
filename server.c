@@ -158,6 +158,15 @@ int main(int argc, char* argv[]) {
         printf("DEBUG: Request Struct - fd: %d, time: %lu\n", debug_req.connfd, debug_req.arrival.tv_sec);
         fflush(stdout);
 
+
+        printf("DEBUG: Checking request_queue address: %p\n", &request_queue);
+        printf("DEBUG: Queue size: %d, Capacity: %d\n", request_queue.size, request_queue.capacity);
+        fflush(stdout);
+
+        printf("DEBUG: Checking queue mutex lock address: %p\n", &request_queue.lock);
+        fflush(stdout);
+
+
         enqueue(&request_queue, debug_req, is_vip);
 
         printf("DEBUG: enqueue() completed successfully!\n");
