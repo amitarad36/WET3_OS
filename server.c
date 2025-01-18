@@ -117,7 +117,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-
     // Create VIP thread
     pthread_t vip_thread_id;
     if (pthread_create(&vip_thread_id, NULL, vip_thread, NULL) != 0) {
@@ -125,11 +124,27 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
+    // Start listening
     listenfd = Open_listenfd(port);
+    if (listenfd < 0) {
+        fprintf(stderr, "Error: Failed to bind to port %d\n", port);
+        exit(1);
+    }
+    printf("Listening on port %d\n", port);
+    fflush(stdout);
 
     while (1) {
         clientlen = sizeof(clientaddr);
+
+        // Debug print before Accept
+        printf("Waiting for a connection...\n");
+        fflush(stdout);
+
         connfd = Accept(listenfd, (SA*)&clientaddr, (socklen_t*)&clientlen);
+
+        // Debug print after Accept
+        printf("Accepted connection from client (fd=%d)\n", connfd);
+        fflush(stdout);
 
         // Capture the arrival time of the request
         struct timeval arrival;
@@ -178,7 +193,6 @@ int main(int argc, char* argv[]) {
 
         // Add the request to the appropriate queue
         enqueue(&request_queue, (Request) { connfd, arrival }, is_vip);
-
         pthread_mutex_unlock(&request_queue.lock);
     }
 
