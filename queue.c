@@ -49,11 +49,18 @@ void enqueue(Queue* q, Request req, int is_vip) {
 }
 
 Request dequeue(Queue* q, int is_vip) {
+    printf("Inside dequeue() function (is_vip=%d)\n", is_vip);
+    fflush(stdout);
+
     pthread_mutex_lock(&q->lock);
+    printf("Mutex locked in dequeue()\n");
+    fflush(stdout);
 
     if (isQueueEmpty(q)) {
+        printf("ERROR: Dequeue called but queue is empty!\n");
+        fflush(stdout);
         pthread_mutex_unlock(&q->lock);
-        return (Request) { -1, { 0, 0 } };
+        return (Request) { -1, { 0, 0 } }; // Invalid request
     }
 
     Request req;
@@ -68,7 +75,13 @@ Request dequeue(Queue* q, int is_vip) {
         q->size--;
     }
 
+    printf("Dequeued request (fd=%d). New size: %d\n", req.connfd, q->size);
+    fflush(stdout);
+
     pthread_mutex_unlock(&q->lock);
+    printf("Mutex unlocked in dequeue()\n");
+    fflush(stdout);
+
     return req;
 }
 
