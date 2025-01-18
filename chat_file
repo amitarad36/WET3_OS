@@ -1,0 +1,54 @@
+#!/bin/bash
+
+echo 'Running basic functionality test...'
+./server 8080 4 10 block & sleep 2
+curl -i http://localhost:8080/home.html
+pkill server
+echo '----------------------'
+
+echo 'Running thread management test...'
+./server 8080 4 10 block & sleep 2
+ps -e | grep server
+pkill server
+echo '----------------------'
+
+echo 'Running queue handling test...'
+./server 8080 2 2 drop_tail & sleep 2
+for i in {1..5}; do curl -i http://localhost:8080/home.html & done
+sleep 5
+pkill server
+echo '----------------------'
+
+echo 'Running overload handling (block) test...'
+./server 8080 2 2 block & sleep 2
+for i in {1..5}; do curl -i http://localhost:8080/home.html & done
+sleep 5
+pkill server
+echo '----------------------'
+
+echo 'Running overload handling (drop_tail) test...'
+./server 8080 2 2 drop_tail & sleep 2
+for i in {1..5}; do curl -i http://localhost:8080/home.html & done
+sleep 5
+pkill server
+echo '----------------------'
+
+echo 'Running overload handling (drop_head) test...'
+./server 8080 2 2 drop_head & sleep 2
+for i in {1..5}; do curl -i http://localhost:8080/home.html & done
+sleep 5
+pkill server
+echo '----------------------'
+
+echo 'Running overload handling (drop_random) test...'
+./server 8080 2 2 drop_random & sleep 2
+for i in {1..5}; do curl -i http://localhost:8080/home.html & done
+sleep 5
+pkill server
+echo '----------------------'
+
+echo 'Running statistics collection test...'
+./server 8080 4 10 block & sleep 2
+curl -i http://localhost:8080/home.html | grep 'Stat-'
+pkill server
+echo '----------------------'
