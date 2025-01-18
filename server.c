@@ -146,7 +146,6 @@ int main(int argc, char* argv[]) {
         printf("Determined request type: %s\n", is_vip ? "VIP" : "Regular");
         fflush(stdout);
 
-        pthread_mutex_lock(&request_queue.lock);
 
         printf("About to enqueue request (fd=%d)...\n", connfd);
         fflush(stdout);
