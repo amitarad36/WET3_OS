@@ -1,6 +1,7 @@
 #include "queue.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 void initQueue(Queue* q, int capacity) {
     q->capacity = capacity;
@@ -18,9 +19,6 @@ void initQueue(Queue* q, int capacity) {
 }
 
 void enqueue(Queue* q, Request req, int is_vip) {
-    printf("Inside enqueue() function (fd=%d)\n", req.connfd);
-    fflush(stdout);
-
     pthread_mutex_lock(&q->lock);
 
     if (isQueueFull(q)) {
@@ -30,7 +28,6 @@ void enqueue(Queue* q, Request req, int is_vip) {
         return;
     }
 
-    // Add the request to the correct queue (VIP or Regular)
     if (is_vip) {
         q->vip_buffer[q->vip_rear] = req;
         q->vip_rear = (q->vip_rear + 1) % q->capacity;
@@ -42,29 +39,18 @@ void enqueue(Queue* q, Request req, int is_vip) {
         q->size++;
     }
 
-    printf("Request enqueued successfully! New size: %d\n", q->size);
+    printf("Request enqueued successfully! Waking up worker thread...\n");
     fflush(stdout);
 
-    // Wake up a worker thread to process this request
     pthread_cond_signal(&q->not_empty);
-    printf("Signal sent to wake up a worker thread!\n");
-    fflush(stdout);
 
     pthread_mutex_unlock(&q->lock);
 }
 
-
 Request dequeue(Queue* q, int is_vip) {
-    printf("Inside dequeue() function (is_vip=%d)\n", is_vip);
-    fflush(stdout);
-
     pthread_mutex_lock(&q->lock);
-    printf("Mutex locked in dequeue()\n");
-    fflush(stdout);
 
     if (isQueueEmpty(q)) {
-        printf("ERROR: Dequeue called but queue is empty!\n");
-        fflush(stdout);
         pthread_mutex_unlock(&q->lock);
         return (Request) { -1, { 0, 0 } };
     }
@@ -81,13 +67,7 @@ Request dequeue(Queue* q, int is_vip) {
         q->size--;
     }
 
-    printf("Dequeued request (fd=%d). New size: %d\n", req.connfd, q->size);
-    fflush(stdout);
-
     pthread_mutex_unlock(&q->lock);
-    printf("Mutex unlocked in dequeue()\n");
-    fflush(stdout);
-
     return req;
 }
 
@@ -105,8 +85,6 @@ void destroyQueue(Queue* q) {
     pthread_cond_destroy(&q->not_empty);
     pthread_cond_destroy(&q->not_full);
 }
-
-#include <time.h>
 
 void dropRandomRequests(Queue* q, int percentage) {
     int to_remove = (q->size * percentage) / 100; // Calculate how many to drop

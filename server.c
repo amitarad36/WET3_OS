@@ -18,13 +18,12 @@
 Queue request_queue;
 
 void* vip_thread(void* arg) {
-    // Allocate a threads_stats struct for the VIP thread
     threads_stats t_stats = malloc(sizeof(struct Threads_stats));
     if (t_stats == NULL) {
         fprintf(stderr, "Error: Failed to allocate memory for VIP thread stats\n");
         pthread_exit(NULL);
     }
-    t_stats->id = -1;  // Use -1 to indicate VIP thread
+    t_stats->id = -1;
     t_stats->stat_req = 0;
     t_stats->dynm_req = 0;
     t_stats->total_req = 0;
@@ -34,7 +33,7 @@ void* vip_thread(void* arg) {
         while (isQueueEmpty(&request_queue) || request_queue.vip_size == 0) {
             pthread_cond_wait(&request_queue.vip_not_empty, &request_queue.lock);
         }
-        Request req = dequeue(&request_queue, 1); // VIP queue
+        Request req = dequeue(&request_queue, 1);
         pthread_mutex_unlock(&request_queue.lock);
 
         struct timeval dispatch;
@@ -44,7 +43,7 @@ void* vip_thread(void* arg) {
         Close(req.connfd);
     }
 
-    free(t_stats); // Should never reach here
+    free(t_stats);
 }
 
 void getargs(int* port, int* threads, int* queue_size, char** schedalg, int argc, char* argv[]) {
@@ -65,13 +64,10 @@ void* worker_thread(void* arg) {
     fflush(stdout);
 
     while (1) {
-        printf("Worker thread %d waiting for a request...\n", t_stats->id);
-        fflush(stdout);
-
         pthread_mutex_lock(&request_queue.lock);
 
         while (isQueueEmpty(&request_queue) || request_queue.vip_size > 0) {
-            printf("Worker thread %d sleeping (queue empty or VIP requests pending)...\n", t_stats->id);
+            printf("Worker thread %d sleeping, waiting for a request...\n", t_stats->id);
             fflush(stdout);
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
         }
@@ -79,14 +75,15 @@ void* worker_thread(void* arg) {
         Request req = dequeue(&request_queue, 0);
         pthread_mutex_unlock(&request_queue.lock);
 
-        printf("Worker thread %d dequeued request (fd=%d)\n", t_stats->id, req.connfd);
+        printf("Worker thread %d processing request (fd=%d)\n", t_stats->id, req.connfd);
         fflush(stdout);
 
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
 
         requestHandle(req.connfd, req.arrival, dispatch, t_stats);
-        printf("Worker thread %d finished handling request (fd=%d)\n", t_stats->id, req.connfd);
+
+        printf("Worker thread %d finished processing request (fd=%d)\n", t_stats->id, req.connfd);
         fflush(stdout);
 
         Close(req.connfd);
@@ -97,16 +94,13 @@ int main(int argc, char* argv[]) {
     int listenfd, connfd, port, clientlen;
     struct sockaddr_in clientaddr;
 
-    // Command-line arguments for port, number of threads, queue size, and scheduling algorithm
     int threads, queue_size;
     char* schedalg;
 
     getargs(&port, &threads, &queue_size, &schedalg, argc, argv);
 
-    // Initialize request queue
     initQueue(&request_queue, queue_size);
 
-    // Create worker threads
     pthread_t* worker_threads = malloc(sizeof(pthread_t) * threads);
     if (worker_threads == NULL) {
         fprintf(stderr, "Error: Failed to allocate memory for worker threads\n");
@@ -114,7 +108,7 @@ int main(int argc, char* argv[]) {
     }
 
     for (int i = 0; i < threads; i++) {
-        threads_stats t_stats = malloc(sizeof(struct Threads_stats)); // Correct: Allocates space for struct
+        threads_stats t_stats = malloc(sizeof(struct Threads_stats));
         if (t_stats == NULL) {
             fprintf(stderr, "Error: Failed to allocate memory for thread stats\n");
             exit(1);
@@ -131,7 +125,6 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // Create VIP thread
     pthread_t vip_thread_id;
     if (pthread_create(&vip_thread_id, NULL, vip_thread, NULL) != 0) {
         fprintf(stderr, "Error: Failed to create VIP thread\n");
@@ -142,69 +135,25 @@ int main(int argc, char* argv[]) {
 
     while (1) {
         clientlen = sizeof(clientaddr);
-        printf("Waiting for new connection...\n");
-        fflush(stdout);
-
         connfd = Accept(listenfd, (SA*)&clientaddr, (socklen_t*)&clientlen);
         printf("Accepted connection from client (fd=%d)\n", connfd);
         fflush(stdout);
 
-        // Capture the arrival time of the request
         struct timeval arrival;
         gettimeofday(&arrival, NULL);
 
-        printf("Checking request type (VIP or Regular)...\n");
-        fflush(stdout);
-
         int is_vip = getRequestType(connfd);
-        printf("Determined request type: %s\n", is_vip ? "VIP" : "Regular");
-        fflush(stdout);
 
+        pthread_mutex_lock(&request_queue.lock);
 
         printf("About to enqueue request (fd=%d)...\n", connfd);
         fflush(stdout);
 
-        printf("DEBUG: Preparing to call enqueue()...\n");
-        fflush(stdout);
-
-        Request debug_req = { connfd, arrival };
-        printf("DEBUG: Request Struct - fd: %d, time: %lu\n", debug_req.connfd, debug_req.arrival.tv_sec);
-        fflush(stdout);
-
-
-        printf("DEBUG: Checking request_queue address: %p\n", &request_queue);
-        printf("DEBUG: Queue size: %d, Capacity: %d\n", request_queue.size, request_queue.capacity);
-        fflush(stdout);
-
-        printf("DEBUG: Checking queue mutex lock address: %p\n", &request_queue.lock);
-        fflush(stdout);
-
-        printf("DEBUG: Checking if queue mutex is locked before enqueue()...\n");
-        fflush(stdout);
-
-        if (pthread_mutex_trylock(&request_queue.lock) == 0) {
-            printf("DEBUG: Mutex is not locked. Proceeding with enqueue()...\n");
-            pthread_mutex_unlock(&request_queue.lock);
-        }
-        else {
-            printf("ERROR: Mutex is already locked! Possible deadlock.\n");
-            fflush(stdout);
-        }
-
-        printf("DEBUG: Calling enqueue() now...\n");
-        fflush(stdout);
-
-        enqueue(&request_queue, debug_req, is_vip);
-
-        printf("DEBUG: enqueue() completed successfully!\n");
-        fflush(stdout);
-        printf("Request successfully enqueued (fd=%d)\n", connfd);
-        fflush(stdout);
+        enqueue(&request_queue, (Request) { connfd, arrival }, is_vip);
 
         pthread_mutex_unlock(&request_queue.lock);
     }
 
-    // Cleanup (Not usually reached)
     for (int i = 0; i < threads; i++) {
         pthread_join(worker_threads[i], NULL);
     }
