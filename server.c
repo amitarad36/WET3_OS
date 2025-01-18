@@ -61,22 +61,36 @@ void getargs(int* port, int* threads, int* queue_size, char** schedalg, int argc
 void* worker_thread(void* arg) {
     threads_stats t_stats = (threads_stats)arg;
 
+    printf("Worker thread %d started\n", t_stats->id);
+    fflush(stdout);
+
     while (1) {
+        printf("Worker thread %d waiting for a request...\n", t_stats->id);
+        fflush(stdout);
+
         pthread_mutex_lock(&request_queue.lock);
+
         while (isQueueEmpty(&request_queue) || request_queue.vip_size > 0) {
+            printf("Worker thread %d sleeping (queue empty or VIP requests pending)...\n", t_stats->id);
+            fflush(stdout);
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
         }
-        Request req = dequeue(&request_queue, 0); // Regular queue
+
+        Request req = dequeue(&request_queue, 0);
         pthread_mutex_unlock(&request_queue.lock);
+
+        printf("Worker thread %d dequeued request (fd=%d)\n", t_stats->id, req.connfd);
+        fflush(stdout);
 
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
 
         requestHandle(req.connfd, req.arrival, dispatch, t_stats);
+        printf("Worker thread %d finished handling request (fd=%d)\n", t_stats->id, req.connfd);
+        fflush(stdout);
+
         Close(req.connfd);
     }
-
-    free(t_stats); // Should never reach here
 }
 
 int main(int argc, char* argv[]) {
