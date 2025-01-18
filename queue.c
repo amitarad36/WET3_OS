@@ -43,6 +43,7 @@ void enqueue(Queue* q, Request req, int is_vip) {
     fflush(stdout);
 
     pthread_cond_signal(&q->not_empty);
+    printf("Signal sent to wake up a worker thread!\n");
 
     pthread_mutex_unlock(&q->lock);
 }
