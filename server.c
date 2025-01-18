@@ -63,12 +63,10 @@ void* worker_thread(void* arg) {
     while (1) {
         pthread_mutex_lock(&request_queue.lock);
 
-        // **Wait until a request is available**
         while (isQueueEmpty(&request_queue)) {
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
         }
 
-        // **Dequeue request**
         Request req = dequeue(&request_queue, 0);
 
         pthread_mutex_unlock(&request_queue.lock);

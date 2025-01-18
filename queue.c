@@ -37,8 +37,7 @@ void enqueue(Queue* q, Request req, int is_vip) {
         q->size++;
     }
 
-    // **Wake up one sleeping worker**
-    pthread_cond_signal(&q->not_empty);
+    pthread_cond_broadcast(&q->not_empty);
 
     pthread_mutex_unlock(&q->lock);
 }
