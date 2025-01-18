@@ -18,32 +18,45 @@ void initQueue(Queue* q, int capacity) {
 }
 
 void enqueue(Queue* q, Request req, int is_vip) {
-    pthread_mutex_lock(&q->lock);
     printf("Inside enqueue() function (fd=%d)\n", req.connfd);
     fflush(stdout);
 
-    if (isQueueFull(q)) {
-        printf("Queue is full! Dropping request (fd=%d)\n", req.connfd);
+    if (q == NULL) {
+        printf("ERROR: Queue pointer is NULL!\n");
         fflush(stdout);
-    }
-    else {
-        if (is_vip) {
-            q->vip_buffer[q->vip_rear] = req;
-            q->vip_rear = (q->vip_rear + 1) % q->capacity;
-            q->vip_size++;
-            printf("VIP request enqueued. VIP Queue size: %d\n", q->vip_size);
-        }
-        else {
-            q->buffer[q->rear] = req;
-            q->rear = (q->rear + 1) % q->capacity;
-            q->size++;
-            printf("Regular request enqueued. Queue size: %d\n", q->size);
-        }
-        pthread_cond_signal(&q->not_empty);
+        return;
     }
 
+    printf("Queue size before enqueue: %d, Capacity: %d\n", q->size, q->capacity);
+    fflush(stdout);
+
+    printf("Trying to lock mutex in enqueue()...\n");
+    fflush(stdout);
+
+    pthread_mutex_lock(&q->lock);
+    printf("Mutex locked in enqueue()!\n");
+    fflush(stdout);
+
+    // ADD THIS CHECK:
+    if (isQueueFull(q)) {
+        printf("ERROR: Queue is full! Request will be dropped.\n");
+        fflush(stdout);
+        pthread_mutex_unlock(&q->lock);
+        return;
+    }
+
+    q->buffer[q->rear] = req;
+    q->rear = (q->rear + 1) % q->capacity;
+    q->size++;
+
+    printf("Request enqueued successfully! New size: %d\n", q->size);
+    fflush(stdout);
+
     pthread_mutex_unlock(&q->lock);
+    printf("Mutex unlocked in enqueue()!\n");
+    fflush(stdout);
 }
+
 
 Request dequeue(Queue* q, int is_vip) {
     pthread_mutex_lock(&q->lock);
