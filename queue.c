@@ -22,13 +22,10 @@ void enqueue(Queue* q, Request req, int is_vip) {
     pthread_mutex_lock(&q->lock);
 
     if (isQueueFull(q)) {
-        printf("ERROR: Queue is full! Request will be dropped.\n");
-        fflush(stdout);
         pthread_mutex_unlock(&q->lock);
         return;
     }
 
-    // Add request to the correct queue
     if (is_vip) {
         q->vip_buffer[q->vip_rear] = req;
         q->vip_rear = (q->vip_rear + 1) % q->capacity;
@@ -40,12 +37,7 @@ void enqueue(Queue* q, Request req, int is_vip) {
         q->size++;
     }
 
-    printf("Request enqueued successfully! Waking up a worker thread...\n");
-    fflush(stdout);
-
-    // **Wake up a worker thread**
-    pthread_cond_signal(&q->not_empty);
-
+    pthread_cond_signal(&q->not_empty); // Wake up worker thread
     pthread_mutex_unlock(&q->lock);
 }
 

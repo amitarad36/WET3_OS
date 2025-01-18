@@ -63,19 +63,13 @@ void* worker_thread(void* arg) {
     while (1) {
         pthread_mutex_lock(&request_queue.lock);
 
-        // **Wait until a request is available**
+        // Wait until there is a request in the queue
         while (isQueueEmpty(&request_queue)) {
-            printf("Worker thread %d: Sleeping (queue empty)...\n", t_stats->id);
-            fflush(stdout);
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
         }
 
-        printf("Worker thread %d: Woke up! Checking queue...\n", t_stats->id);
-        fflush(stdout);
-
-        // **Dequeue a request**
-        Request req = dequeue(&request_queue, 0);  // Regular request
-
+        // Get the request from the queue
+        Request req = dequeue(&request_queue, 0);
         pthread_mutex_unlock(&request_queue.lock);
 
         if (req.connfd == -1) {
@@ -85,7 +79,7 @@ void* worker_thread(void* arg) {
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
 
-        // **Handle the request**
+        // Handle the request
         requestHandle(req.connfd, req.arrival, dispatch, t_stats);
         Close(req.connfd);
     }
