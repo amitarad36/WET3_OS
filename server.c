@@ -70,6 +70,7 @@ void* worker_thread(void* arg) {
             printf("Worker thread %d sleeping, waiting for a request...\n", t_stats->id);
             fflush(stdout);
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
+            printf("Worker thread %d: waiting for a request...\n", t_stats->id);
         }
 
         Request req = dequeue(&request_queue, 0);
