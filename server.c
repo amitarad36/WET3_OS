@@ -139,21 +139,20 @@ int main(int argc, char* argv[]) {
         printf("Accepted connection from client (fd=%d)\n", connfd);
         fflush(stdout);
 
+        // Capture the arrival time of the request
         struct timeval arrival;
         gettimeofday(&arrival, NULL);
 
         int is_vip = getRequestType(connfd);
-
-        pthread_mutex_lock(&request_queue.lock);
 
         printf("About to enqueue request (fd=%d)...\n", connfd);
         fflush(stdout);
 
         enqueue(&request_queue, (Request) { connfd, arrival }, is_vip);
 
-        pthread_mutex_unlock(&request_queue.lock);
+        printf("Request successfully enqueued (fd=%d)\n", connfd);
+        fflush(stdout);
     }
-
     for (int i = 0; i < threads; i++) {
         pthread_join(worker_threads[i], NULL);
     }
