@@ -22,8 +22,6 @@ void enqueue(Queue* q, Request req, int is_vip) {
     pthread_mutex_lock(&q->lock);
 
     if (isQueueFull(q)) {
-        printf("ERROR: Queue is full! Request will be dropped.\n");
-        fflush(stdout);
         pthread_mutex_unlock(&q->lock);
         return;
     }
@@ -39,61 +37,34 @@ void enqueue(Queue* q, Request req, int is_vip) {
         q->size++;
     }
 
-    printf("Request enqueued successfully! Waking up worker thread...\n");
-    fflush(stdout);
-
+    // Signal a waiting worker thread to wake up
     pthread_cond_signal(&q->not_empty);
-    printf("Signal sent to wake up a worker thread!\n");
 
     pthread_mutex_unlock(&q->lock);
 }
 
 Request dequeue(Queue* q, int is_vip) {
-    printf("Inside dequeue() function (is_vip=%d)\n", is_vip);
-    fflush(stdout);
-
-    // Try to acquire the mutex
-    int lock_status = pthread_mutex_trylock(&q->lock);
-    if (lock_status != 0) {
-        printf("ERROR: Failed to lock mutex in dequeue(), it is already locked!\n");
-        fflush(stdout);
-        return (Request) { -1, { 0, 0 } }; // Return invalid request
-    }
-
-    printf("Mutex locked in dequeue()\n");
-    fflush(stdout);
-
-    // Check if the queue is empty before attempting to dequeue
-    if (isQueueEmpty(q)) {
-        printf("ERROR: Dequeue called but queue is empty!\n");
-        fflush(stdout);
-        pthread_mutex_unlock(&q->lock);
-        printf("Mutex unlocked in dequeue() (queue was empty)\n");
-        fflush(stdout);
-        return (Request) { -1, { 0, 0 } }; // Return invalid request
-    }
-
     Request req;
+
+    pthread_mutex_lock(&q->lock);
+
+    if (isQueueEmpty(q)) {
+        pthread_mutex_unlock(&q->lock);
+        return (Request) { -1, { 0, 0 } }; // Return invalid request
+    }
+
     if (is_vip && q->vip_size > 0) {
         req = q->vip_buffer[q->vip_front];
         q->vip_front = (q->vip_front + 1) % q->capacity;
         q->vip_size--;
-        printf("VIP request dequeued (fd=%d). New VIP queue size: %d\n", req.connfd, q->vip_size);
     }
     else {
         req = q->buffer[q->front];
         q->front = (q->front + 1) % q->capacity;
         q->size--;
-        printf("Regular request dequeued (fd=%d). New queue size: %d\n", req.connfd, q->size);
     }
 
-    fflush(stdout);
-
-    // Unlock the mutex before returning
     pthread_mutex_unlock(&q->lock);
-    printf("Mutex unlocked in dequeue()\n");
-    fflush(stdout);
-
     return req;
 }
 

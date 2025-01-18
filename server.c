@@ -60,42 +60,28 @@ void getargs(int* port, int* threads, int* queue_size, char** schedalg, int argc
 void* worker_thread(void* arg) {
     threads_stats t_stats = (threads_stats)arg;
 
-    printf("Worker thread %d started\n", t_stats->id);
-    fflush(stdout);
-
     while (1) {
-        printf("Worker thread %d: Waiting for a request...\n", t_stats->id);
-        fflush(stdout);
-
         pthread_mutex_lock(&request_queue.lock);
 
-        // Wait if queue is empty or VIP requests are pending
-        while (isQueueEmpty(&request_queue) || request_queue.vip_size > 0) {
-            printf("Worker thread %d: Sleeping (queue empty or VIP requests pending)...\n", t_stats->id);
-            fflush(stdout);
+        // Wait until a request is available and VIP queue is empty
+        while (isQueueEmpty(&request_queue) || (request_queue.vip_size > 0)) {
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
         }
 
-        printf("Worker thread %d: Woke up! Checking queue...\n", t_stats->id);
-        fflush(stdout);
-
-        // Dequeue a request
-        Request req = dequeue(&request_queue, 0);  // Regular request
-
-        printf("Worker thread %d: Dequeued request (fd=%d)\n", t_stats->id, req.connfd);
-        fflush(stdout);
-
+        // Retrieve a request from the queue
+        Request req = dequeue(&request_queue, 0); // Regular queue
         pthread_mutex_unlock(&request_queue.lock);
+
+        // Ensure we have a valid request
+        if (req.connfd == -1) {
+            continue;
+        }
 
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
 
         // Handle the request
         requestHandle(req.connfd, req.arrival, dispatch, t_stats);
-
-        printf("Worker thread %d: Finished handling request (fd=%d)\n", t_stats->id, req.connfd);
-        fflush(stdout);
-
         Close(req.connfd);
     }
 }
