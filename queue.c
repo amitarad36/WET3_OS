@@ -44,15 +44,14 @@ void enqueue(Queue* q, Request req, int is_vip) {
 }
 
 Request dequeue(Queue* q, int is_vip) {
-    Request req;
-
     pthread_mutex_lock(&q->lock);
 
     if (isQueueEmpty(q)) {
         pthread_mutex_unlock(&q->lock);
-        return (Request) { -1, { 0, 0 } }; // Return invalid request
+        return (Request) { -1, { 0, 0 } };
     }
 
+    Request req;
     if (is_vip && q->vip_size > 0) {
         req = q->vip_buffer[q->vip_front];
         q->vip_front = (q->vip_front + 1) % q->capacity;

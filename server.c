@@ -63,8 +63,8 @@ void* worker_thread(void* arg) {
     while (1) {
         pthread_mutex_lock(&request_queue.lock);
 
-        // Wait until a request is available and VIP queue is empty
-        while (isQueueEmpty(&request_queue) || (request_queue.vip_size > 0)) {
+        // Wait for available requests (either VIP or regular)
+        while (isQueueEmpty(&request_queue)) {
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
         }
 
@@ -74,7 +74,7 @@ void* worker_thread(void* arg) {
 
         // Ensure we have a valid request
         if (req.connfd == -1) {
-            continue;
+            continue;  // Ignore invalid request
         }
 
         struct timeval dispatch;
@@ -82,6 +82,7 @@ void* worker_thread(void* arg) {
 
         // Handle the request
         requestHandle(req.connfd, req.arrival, dispatch, t_stats);
+
         Close(req.connfd);
     }
 }
