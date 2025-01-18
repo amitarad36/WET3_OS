@@ -166,6 +166,20 @@ int main(int argc, char* argv[]) {
         printf("DEBUG: Checking queue mutex lock address: %p\n", &request_queue.lock);
         fflush(stdout);
 
+        printf("DEBUG: Checking if queue mutex is locked before enqueue()...\n");
+        fflush(stdout);
+
+        if (pthread_mutex_trylock(&request_queue.lock) == 0) {
+            printf("DEBUG: Mutex is not locked. Proceeding with enqueue()...\n");
+            pthread_mutex_unlock(&request_queue.lock);
+        }
+        else {
+            printf("ERROR: Mutex is already locked! Possible deadlock.\n");
+            fflush(stdout);
+        }
+
+        printf("DEBUG: Calling enqueue() now...\n");
+        fflush(stdout);
 
         enqueue(&request_queue, debug_req, is_vip);
 

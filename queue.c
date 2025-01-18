@@ -45,7 +45,6 @@ void enqueue(Queue* q, Request req, int is_vip) {
     pthread_mutex_unlock(&q->lock);
 }
 
-
 Request dequeue(Queue* q, int is_vip) {
     pthread_mutex_lock(&q->lock);
 
