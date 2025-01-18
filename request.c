@@ -190,14 +190,26 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
     Rio_readinitb(&rio, fd);
 
     // Read request line
-    Rio_readlineb(&rio, buf, MAXLINE);
+    if (Rio_readlineb(&rio, buf, MAXLINE) <= 0) {
+        fprintf(stderr, "Error: Failed to read request line\n");
+        return;
+    }
     sscanf(buf, "%s %s %s", method, uri, version);
+
+    // Debug print for received request
+    printf("Received request: %s %s %s\n", method, uri, version);
+    fflush(stdout);
 
     // Only support GET requests
     if (strcasecmp(method, "GET") != 0) {
         requestError(fd, method, "501", "Not Implemented", "Server does not support this method", arrival, dispatch, t_stats);
         return;
     }
+
+    // Read and discard HTTP request headers
+    printf("Reading headers...\n");
+    requestReadhdrs(&rio);
+    printf("Finished reading headers.\n");
 
     // Determine if the request is static or dynamic
     char filename[MAXLINE], cgiargs[MAXLINE];
