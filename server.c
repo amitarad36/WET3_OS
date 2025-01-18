@@ -151,8 +151,17 @@ int main(int argc, char* argv[]) {
         printf("About to enqueue request (fd=%d)...\n", connfd);
         fflush(stdout);
 
-        enqueue(&request_queue, (Request) { connfd, arrival }, is_vip);
+        printf("DEBUG: Preparing to call enqueue()...\n");
+        fflush(stdout);
 
+        Request debug_req = { connfd, arrival };
+        printf("DEBUG: Request Struct - fd: %d, time: %lu\n", debug_req.connfd, debug_req.arrival.tv_sec);
+        fflush(stdout);
+
+        enqueue(&request_queue, debug_req, is_vip);
+
+        printf("DEBUG: enqueue() completed successfully!\n");
+        fflush(stdout);
         printf("Request successfully enqueued (fd=%d)\n", connfd);
         fflush(stdout);
 
