@@ -124,25 +124,14 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
-    // Start listening
     listenfd = Open_listenfd(port);
-    if (listenfd < 0) {
-        fprintf(stderr, "Error: Failed to bind to port %d\n", port);
-        exit(1);
-    }
-    printf("Listening on port %d\n", port);
-    fflush(stdout);
 
     while (1) {
         clientlen = sizeof(clientaddr);
-
-        // Debug print before Accept
-        printf("Waiting for a connection...\n");
+        printf("Waiting for new connection...\n");
         fflush(stdout);
 
         connfd = Accept(listenfd, (SA*)&clientaddr, (socklen_t*)&clientlen);
-
-        // Debug print after Accept
         printf("Accepted connection from client (fd=%d)\n", connfd);
         fflush(stdout);
 
@@ -150,49 +139,23 @@ int main(int argc, char* argv[]) {
         struct timeval arrival;
         gettimeofday(&arrival, NULL);
 
-        int is_vip = getRequestType(connfd); // Check if request is VIP
+        printf("Checking request type (VIP or Regular)...\n");
+        fflush(stdout);
+
+        int is_vip = getRequestType(connfd);
+        printf("Determined request type: %s\n", is_vip ? "VIP" : "Regular");
+        fflush(stdout);
 
         pthread_mutex_lock(&request_queue.lock);
 
-        // If the queue is full, apply the appropriate overload policy
-        if (isQueueFull(&request_queue)) {
-            if (is_vip) {
-                // VIP requests always block until a slot is available
-                while (isQueueFull(&request_queue)) {
-                    pthread_cond_wait(&request_queue.not_full, &request_queue.lock);
-                }
-            }
-            else {
-                // Apply the specified overload policy for regular requests
-                if (strcmp(schedalg, "block") == 0) {
-                    while (isQueueFull(&request_queue)) {
-                        pthread_cond_wait(&request_queue.not_full, &request_queue.lock);
-                    }
-                }
-                else if (strcmp(schedalg, "dt") == 0) { // Drop Tail
-                    Close(connfd);
-                    pthread_mutex_unlock(&request_queue.lock);
-                    continue;
-                }
-                else if (strcmp(schedalg, "dh") == 0) { // Drop Head
-                    dequeue(&request_queue, 0); // Remove the oldest request
-                }
-                else if (strcmp(schedalg, "block_flush") == 0) { // Bonus Policy
-                    while (request_queue.size > 0) {
-                        pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
-                    }
-                    Close(connfd);
-                    pthread_mutex_unlock(&request_queue.lock);
-                    continue;
-                }
-                else if (strcmp(schedalg, "drop_random") == 0) { // Bonus Policy
-                    dropRandomRequests(&request_queue, 50); // Drop 50% of regular requests
-                }
-            }
-        }
+        printf("About to enqueue request (fd=%d)...\n", connfd);
+        fflush(stdout);
 
-        // Add the request to the appropriate queue
         enqueue(&request_queue, (Request) { connfd, arrival }, is_vip);
+
+        printf("Request successfully enqueued (fd=%d)\n", connfd);
+        fflush(stdout);
+
         pthread_mutex_unlock(&request_queue.lock);
     }
 
