@@ -18,28 +18,32 @@ void initQueue(Queue* q, int capacity) {
     pthread_cond_init(&q->not_full, NULL);
 }
 
-void enqueue(Queue* q, Request req, int is_vip) {
-    pthread_mutex_lock(&q->lock);
+void* worker_thread(void* arg) {
+    threads_stats t_stats = (threads_stats)arg;
 
-    if (isQueueFull(q)) {
-        pthread_mutex_unlock(&q->lock);
-        return;
+    while (1) {
+        pthread_mutex_lock(&request_queue.lock);
+
+        while (isQueueEmpty(&request_queue)) {
+            pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
+        }
+
+        Request req = dequeue(&request_queue, 0);
+
+        pthread_mutex_unlock(&request_queue.lock);
+
+        // **Ensure we have a valid request**
+        if (req.connfd == -1) {
+            continue;
+        }
+
+        struct timeval dispatch;
+        gettimeofday(&dispatch, NULL);
+
+        // **Process the request**
+        requestHandle(req.connfd, req.arrival, dispatch, t_stats);
+        Close(req.connfd);
     }
-
-    if (is_vip) {
-        q->vip_buffer[q->vip_rear] = req;
-        q->vip_rear = (q->vip_rear + 1) % q->capacity;
-        q->vip_size++;
-    }
-    else {
-        q->buffer[q->rear] = req;
-        q->rear = (q->rear + 1) % q->capacity;
-        q->size++;
-    }
-
-    pthread_cond_broadcast(&q->not_empty);
-
-    pthread_mutex_unlock(&q->lock);
 }
 
 Request dequeue(Queue* q, int is_vip) {
