@@ -38,6 +38,9 @@ void enqueue(Queue* q, Request req, int is_vip) {
     }
 
     // Ensure a worker thread is notified to process the request
+    printf("Signaling worker thread: request added to queue\n");
+    fflush(stdout);
+
     pthread_cond_signal(&q->not_empty);
 
     pthread_mutex_unlock(&q->lock);
@@ -62,6 +65,8 @@ Request dequeue(Queue* q, int is_vip) {
         q->front = (q->front + 1) % q->capacity;
         q->size--;
     }
+    printf("Dequeued request (fd=%d)\n", req.connfd);
+    fflush(stdout);
 
     pthread_mutex_unlock(&q->lock);
     return req;
@@ -72,7 +77,10 @@ int isQueueFull(Queue* q) {
 }
 
 int isQueueEmpty(Queue* q) {
-    return q->size == 0;
+    int result = (q->size == 0);
+    printf("Queue Empty Check: %d (Size = %d)\n", result, q->size);
+    fflush(stdout);
+    return result;
 }
 
 void destroyQueue(Queue* q) {

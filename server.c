@@ -69,6 +69,8 @@ void* worker_thread(void* arg) {
         while (isQueueEmpty(&request_queue)) {
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
         }
+        printf("Worker thread woke up to process request...\n");
+        fflush(stdout);
 
         // Ensure we actually dequeued a request
         Request req = dequeue(&request_queue, 0);
