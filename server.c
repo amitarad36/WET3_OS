@@ -74,7 +74,6 @@ void* worker_thread(void* arg) {
         printf("Worker thread attempting to dequeue...\n"); // DEBUG
         fflush(stdout);
 
-        Request req = dequeue(&request_queue, 0);
 
         // Ensure we actually dequeued a request
         Request req = dequeue(&request_queue, 0);
