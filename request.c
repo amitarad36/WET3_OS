@@ -198,8 +198,17 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
         fprintf(stderr, "Error: Received NULL thread stats\n");
         return;
     }
-    printf("Handling request for fd=%d\n", fd); // DEBUG
+
+    printf("Handling request for fd=%d\n", fd);
     fflush(stdout);
+
+    // Check if the file descriptor is valid
+    if (fd <= 0) {
+        printf("ERROR: Received invalid fd=%d in requestHandle!\n", fd);
+        fflush(stdout);
+        return;
+    }
+
     rio_t rio;
     char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
 
@@ -207,39 +216,55 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
 
     // Read request line
     if (Rio_readlineb(&rio, buf, MAXLINE) <= 0) {
-        fprintf(stderr, "Error: Failed to read request line\n");
+        fprintf(stderr, "Error: Failed to read request line (fd=%d)\n", fd);
         return;
     }
     sscanf(buf, "%s %s %s", method, uri, version);
-    printf("Method: %s, URI: %s, Version: %s\n", method, uri, version);
+
+    printf("Parsed request - fd=%d, Method: %s, URI: %s, Version: %s\n", fd, method, uri, version);
     fflush(stdout);
 
     // Only support GET requests
     if (strcasecmp(method, "GET") != 0) {
+        printf("ERROR: Unsupported method %s received (fd=%d)\n", method, fd);
+        fflush(stdout);
         requestError(fd, method, "501", "Not Implemented", "Server does not support this method", arrival, dispatch, t_stats);
         return;
     }
 
     // Read and discard HTTP request headers
+    printf("Reading headers for fd=%d...\n", fd);
+    fflush(stdout);
     requestReadhdrs(&rio);
+    printf("Finished reading headers for fd=%d.\n", fd);
+    fflush(stdout);
 
     // Determine if the request is static or dynamic
     char filename[MAXLINE], cgiargs[MAXLINE];
     int is_static = isStaticRequest(uri);
     requestParseURI(uri, filename, cgiargs);
-    printf("Requested filename: %s\n", filename); // DEBUG
+
+    printf("Requested filename: %s (fd=%d)\n", filename, fd);
     fflush(stdout);
+
+    // Check if the requested file exists
     struct stat sbuf;
     if (stat(filename, &sbuf) < 0) {
+        printf("ERROR: File not found: %s (fd=%d)\n", filename, fd);
+        fflush(stdout);
         requestError(fd, filename, "404", "Not Found", "File not found", arrival, dispatch, t_stats);
         return;
     }
 
-    // Serve request
+    // Serve the request
     if (is_static) {
+        printf("Serving static content: %s (fd=%d)\n", filename, fd);
+        fflush(stdout);
         requestServeStatic(fd, filename, sbuf.st_size, arrival, dispatch, t_stats);
     }
     else {
+        printf("Serving dynamic content: %s (fd=%d)\n", filename, fd);
+        fflush(stdout);
         requestServeDynamic(fd, filename, cgiargs);
     }
 }

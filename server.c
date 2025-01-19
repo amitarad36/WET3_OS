@@ -81,19 +81,18 @@ void* worker_thread(void* arg) {
         printf("Worker received request fd=%d from dequeue\n", req.connfd);
         fflush(stdout);
 
-        if (req.connfd == -1) {
-            printf("Invalid request received, skipping...\n");
+        if (req.connfd <= 0) {
+            printf("ERROR: Invalid fd received by worker thread: %d\n", req.connfd);
             fflush(stdout);
-            continue; // If request is invalid, go back to waiting
+            continue;
         }
 
-        printf("Worker processing request (fd=%d)\n", req.connfd); // DEBUG
+        printf("Worker processing request (fd=%d)\n", req.connfd);
         fflush(stdout);
 
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
 
-        // Process the request
         requestHandle(req.connfd, req.arrival, dispatch, t_stats);
         Close(req.connfd);
     }

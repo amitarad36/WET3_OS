@@ -22,9 +22,14 @@ void enqueue(Queue* q, Request req, int is_vip) {
     pthread_mutex_lock(&q->lock);
 
     if (isQueueFull(q)) {
+        printf("Queue is full! Dropping request (fd=%d)\n", req.connfd);
+        fflush(stdout);
         pthread_mutex_unlock(&q->lock);
         return;
     }
+
+    printf("Enqueueing request: fd=%d | Queue Size Before: %d\n", req.connfd, q->size);
+    fflush(stdout);
 
     if (is_vip) {
         q->vip_buffer[q->vip_rear] = req;
@@ -37,12 +42,10 @@ void enqueue(Queue* q, Request req, int is_vip) {
         q->size++;
     }
 
-    // Ensure a worker thread is notified to process the request
-    printf("Signaling worker thread: request added to queue\n");
+    printf("Request enqueued: fd=%d | Queue Size After: %d\n", req.connfd, q->size);
     fflush(stdout);
 
     pthread_cond_signal(&q->not_empty);
-
     pthread_mutex_unlock(&q->lock);
 }
 
@@ -53,10 +56,7 @@ Request dequeue(Queue* q, int is_vip) {
     fflush(stdout);
 
     pthread_mutex_lock(&q->lock);
-    printf("Mutex locked inside dequeue.\n"); // DEBUG
-    fflush(stdout);
-
-    printf("Checking if queue is empty inside dequeue...\n");
+    printf("Mutex locked inside dequeue.\n");
     fflush(stdout);
 
     if (isQueueEmpty(q)) {
@@ -67,9 +67,6 @@ Request dequeue(Queue* q, int is_vip) {
         fflush(stdout);
         return (Request) { -1, { 0, 0 } };
     }
-
-    printf("Dequeuing request: fd=%d | Queue Size Before: %d\n", q->buffer[q->front].connfd, q->size);
-    fflush(stdout);
 
     if (is_vip && q->vip_size > 0) {
         req = q->vip_buffer[q->vip_front];
@@ -82,11 +79,11 @@ Request dequeue(Queue* q, int is_vip) {
         q->size--;
     }
 
-    printf("Dequeued request (fd=%d) | Queue Size After: %d\n", req.connfd, q->size);
+    printf("Dequeued request: fd=%d | Queue Size After: %d\n", req.connfd, q->size);
     fflush(stdout);
 
     pthread_mutex_unlock(&q->lock);
-    printf("Mutex unlocked inside dequeue.\n"); // DEBUG
+    printf("Mutex unlocked inside dequeue.\n");
     fflush(stdout);
 
     return req;
