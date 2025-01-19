@@ -49,6 +49,8 @@ void enqueue(Queue* q, Request req, int is_vip) {
 Request dequeue(Queue* q, int is_vip) {
     Request req;
     pthread_mutex_lock(&q->lock);
+    printf("Dequeue function called. Queue Size: %d\n", q->size);
+    fflush(stdout);
 
     if (isQueueEmpty(q)) {
         pthread_mutex_unlock(&q->lock);
