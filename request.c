@@ -28,27 +28,13 @@ void requestError(int fd, char* cause, char* errnum, char* shortmsg, char* longm
     printf("Sending error response (fd=%d):\n%s", fd, buf);
     fflush(stdout);
 
-    ssize_t bytes_written = Rio_writen(fd, buf, strlen(buf));
-    if (bytes_written < 0) {
-        printf("ERROR: Failed to write error headers to client (fd=%d)\n", fd);
-        fflush(stdout);
-        return;
-    }
-    else {
-        printf("Successfully sent %ld bytes of error headers to client (fd=%d)\n", bytes_written, fd);
-        fflush(stdout);
-    }
+    Rio_writen(fd, buf, strlen(buf));  // No assignment
+    printf("Successfully sent error headers to client (fd=%d)\n", fd);
+    fflush(stdout);
 
-    bytes_written = Rio_writen(fd, body, strlen(body));
-    if (bytes_written < 0) {
-        printf("ERROR: Failed to write error body to client (fd=%d)\n", fd);
-        fflush(stdout);
-        return;
-    }
-    else {
-        printf("Successfully sent %ld bytes of error body to client (fd=%d)\n", bytes_written, fd);
-        fflush(stdout);
-    }
+    Rio_writen(fd, body, strlen(body));  // No assignment
+    printf("Successfully sent error body to client (fd=%d)\n", fd);
+    fflush(stdout);
 }
 
 //
@@ -149,31 +135,17 @@ void requestServeStatic(int fd, char* filename, int filesize, struct timeval arr
     printf("Sending response headers:\n%s", buf);
     fflush(stdout);
 
-    ssize_t bytes_written = Rio_writen(fd, buf, strlen(buf));
-    if (bytes_written < 0) {
-        printf("ERROR: Failed to write response headers to client (fd=%d)\n", fd);
-        fflush(stdout);
-        return;
-    }
-    else {
-        printf("Successfully sent %ld bytes of headers to client (fd=%d)\n", bytes_written, fd);
-        fflush(stdout);
-    }
+    Rio_writen(fd, buf, strlen(buf));  // No assignment
+    printf("Successfully sent response headers to client (fd=%d)\n", fd);
+    fflush(stdout);
 
     // Send the file content
     printf("Sending file content to fd=%d\n", fd);
     fflush(stdout);
 
-    bytes_written = Rio_writen(fd, srcp, filesize);
-    if (bytes_written < 0) {
-        printf("ERROR: Failed to write file content to client (fd=%d)\n", fd);
-        fflush(stdout);
-        return;
-    }
-    else {
-        printf("Successfully sent %ld bytes of file content to client (fd=%d)\n", bytes_written, fd);
-        fflush(stdout);
-    }
+    Rio_writen(fd, srcp, filesize);  // No assignment
+    printf("Successfully sent file content to client (fd=%d)\n", fd);
+    fflush(stdout);
 
     Munmap(srcp, filesize);
     printf("Finished sending file: %s (fd=%d)\n", filename, fd);
