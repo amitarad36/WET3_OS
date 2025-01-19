@@ -219,8 +219,9 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
     }
 
     // **READ HEADERS BEFORE PROCESSING REQUEST**
+    printf("Reading headers...\n");
     requestReadhdrs(&rio);
-    printf("Finished reading headers.\n");
+    printf("Headers read successfully!\n");
     fflush(stdout);
 
     // Parse URI and determine file path

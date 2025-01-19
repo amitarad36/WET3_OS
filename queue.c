@@ -45,11 +45,11 @@ void enqueue(Queue* q, Request req, int is_vip) {
 Request dequeue(Queue* q, int is_vip) {
     pthread_mutex_lock(&q->lock);
 
-    if (isQueueEmpty(q)) {
-        printf("ERROR: Dequeue called but queue is empty!\n");
-        fflush(stdout);
+    while (isQueueEmpty(q)) {  // Instead of returning an invalid request
         pthread_mutex_unlock(&q->lock);
-        return (Request) { -1, { 0, 0 } }; // Return an invalid request
+        printf("ERROR: Dequeue called but queue is empty! Retrying...\n");
+        fflush(stdout);
+        pthread_mutex_lock(&q->lock);
     }
 
     Request req;
@@ -63,9 +63,6 @@ Request dequeue(Queue* q, int is_vip) {
         q->front = (q->front + 1) % q->capacity;
         q->size--;
     }
-
-    printf("Dequeued request (fd=%d). New queue size: %d\n", req.connfd, q->size);
-    fflush(stdout);
 
     pthread_mutex_unlock(&q->lock);
     return req;
