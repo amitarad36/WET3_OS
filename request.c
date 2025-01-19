@@ -198,7 +198,6 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
     rio_t rio;
     char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
 
-    // Initialize `rio`
     Rio_readinitb(&rio, fd);
 
     // Read request line
@@ -208,23 +207,16 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
     }
     sscanf(buf, "%s %s %s", method, uri, version);
 
-    // Debug print for received request
-    printf("Received request: %s %s %s\n", method, uri, version);
-    fflush(stdout);
-
     // Only support GET requests
     if (strcasecmp(method, "GET") != 0) {
         requestError(fd, method, "501", "Not Implemented", "Server does not support this method", arrival, dispatch, t_stats);
         return;
     }
 
-    // **READ HEADERS BEFORE PROCESSING REQUEST**
-    printf("Reading headers...\n");
+    // Read and discard HTTP request headers
     requestReadhdrs(&rio);
-    printf("Headers read successfully!\n");
-    fflush(stdout);
 
-    // Parse URI and determine file path
+    // Determine if the request is static or dynamic
     char filename[MAXLINE], cgiargs[MAXLINE];
     int is_static = isStaticRequest(uri);
     requestParseURI(uri, filename, cgiargs);
@@ -235,21 +227,6 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
         return;
     }
 
-    // Lock statistics update
-    pthread_mutex_lock(&stat_lock);
-    t_stats->total_req++;
-    if (is_static) {
-        t_stats->stat_req++;
-    }
-    else {
-        t_stats->dynm_req++;
-    }
-    pthread_mutex_unlock(&stat_lock);
-
-    // **DEBUG: Confirm if request is static or dynamic**
-    printf("Request type: %s\n", is_static ? "STATIC" : "DYNAMIC");
-    fflush(stdout);
-
     // Serve request
     if (is_static) {
         requestServeStatic(fd, filename, sbuf.st_size, arrival, dispatch, t_stats);
@@ -257,7 +234,4 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
     else {
         requestServeDynamic(fd, filename, cgiargs);
     }
-
-    printf("Response sent successfully!\n");
-    fflush(stdout);
 }

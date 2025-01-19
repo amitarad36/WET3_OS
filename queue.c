@@ -37,22 +37,21 @@ void enqueue(Queue* q, Request req, int is_vip) {
         q->size++;
     }
 
-    pthread_cond_broadcast(&q->not_empty);
+    // Ensure a worker thread is notified to process the request
+    pthread_cond_signal(&q->not_empty);
 
     pthread_mutex_unlock(&q->lock);
 }
 
 Request dequeue(Queue* q, int is_vip) {
+    Request req;
     pthread_mutex_lock(&q->lock);
 
-    while (isQueueEmpty(q)) {  // Instead of returning an invalid request
+    if (isQueueEmpty(q)) {
         pthread_mutex_unlock(&q->lock);
-        printf("ERROR: Dequeue called but queue is empty! Retrying...\n");
-        fflush(stdout);
-        pthread_mutex_lock(&q->lock);
+        return (Request) { -1, { 0, 0 } };
     }
 
-    Request req;
     if (is_vip && q->vip_size > 0) {
         req = q->vip_buffer[q->vip_front];
         q->vip_front = (q->vip_front + 1) % q->capacity;

@@ -61,35 +61,24 @@ void* worker_thread(void* arg) {
     threads_stats t_stats = (threads_stats)arg;
 
     while (1) {
-        printf("Worker thread %d: Waiting for a request...\n", t_stats->id);
-        fflush(stdout);
-
         pthread_mutex_lock(&request_queue.lock);
 
         while (isQueueEmpty(&request_queue)) {
-            printf("Worker thread %d: Sleeping...\n", t_stats->id);
-            fflush(stdout);
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
-            printf("Worker thread %d: Woke up!\n", t_stats->id);
-            fflush(stdout);
         }
 
-        // Retrieve a request from the queue
+        // Ensure we actually dequeued a request
         Request req = dequeue(&request_queue, 0);
         pthread_mutex_unlock(&request_queue.lock);
 
         if (req.connfd == -1) {
-            printf("Worker thread %d: Received invalid request, skipping...\n", t_stats->id);
-            fflush(stdout);
-            continue;
+            continue; // If request is invalid, go back to waiting
         }
 
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
 
-        printf("Worker thread %d: Processing request (fd=%d)\n", t_stats->id, req.connfd);
-        fflush(stdout);
-
+        // Process the request
         requestHandle(req.connfd, req.arrival, dispatch, t_stats);
         Close(req.connfd);
     }
