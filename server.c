@@ -75,6 +75,9 @@ void* worker_thread(void* arg) {
             continue; // If request is invalid, go back to waiting
         }
 
+        printf("Worker processing request (fd=%d)\n", req.connfd); // DEBUG
+        fflush(stdout);
+
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
 

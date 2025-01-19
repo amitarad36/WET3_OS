@@ -26,50 +26,56 @@
 /*
  * Send an HTTP request for the specified file 
  */
-void clientSend(int fd, char *filename, char* method)
+void clientSend(int fd, char* filename, char* method)
 {
-  char buf[MAXLINE];
-  char hostname[MAXLINE];
+    char buf[MAXLINE];
+    char hostname[MAXLINE];
 
-  Gethostname(hostname, MAXLINE);
+    Gethostname(hostname, MAXLINE);
 
-  /* Form and send the HTTP request */
-  sprintf(buf, "%s %s HTTP/1.1\n",method, filename);
-  sprintf(buf, "%shost: %s\n\r\n", buf, hostname);
-  printf("%s\n", buf);
-  Rio_writen(fd, buf, strlen(buf));
+    /* Form and send the HTTP request */
+    sprintf(buf, "%s %s HTTP/1.1\r\n", method, filename);  // Ensure \r\n
+    sprintf(buf, "%shost: %s\r\n\r\n", buf, hostname);
+
+    printf("Client sending request:\n%s\n", buf); // DEBUG
+    fflush(stdout);
+
+    Rio_writen(fd, buf, strlen(buf));
 }
-  
+
 /*
  * Read the HTTP response and print it out
  */
 void clientPrint(int fd)
 {
-  rio_t rio;
-  char buf[MAXBUF];  
-  int length = 0;
-  int n;
-  
-  Rio_readinitb(&rio, fd);
+    rio_t rio;
+    char buf[MAXBUF];
+    int length = 0;
+    int n;
 
-  /* Read and display the HTTP Header */
-  n = Rio_readlineb(&rio, buf, MAXBUF);
-  while (strcmp(buf, "\r\n") && (n > 0)) {
-    printf("Header: %s", buf);
+    Rio_readinitb(&rio, fd);
+
+    /* Read and display the HTTP Header */
     n = Rio_readlineb(&rio, buf, MAXBUF);
+    while (strcmp(buf, "\r\n") && (n > 0)) {
+        printf("Header: %s", buf);
+        fflush(stdout);  // Ensure output appears immediately
+        n = Rio_readlineb(&rio, buf, MAXBUF);
 
-    /* If you want to look for certain HTTP tags... */
-    if (sscanf(buf, "Content-Length: %d ", &length) == 1) {
-      printf("Length = %d\n", length);
+        /* If you want to look for certain HTTP tags... */
+        if (sscanf(buf, "Content-Length: %d ", &length) == 1) {
+            printf("Length = %d\n", length);
+            fflush(stdout);
+        }
     }
-  }
 
-  /* Read and display the HTTP Body */
-  n = Rio_readlineb(&rio, buf, MAXBUF);
-  while (n > 0) {
-    printf("%s", buf);
+    /* Read and display the HTTP Body */
     n = Rio_readlineb(&rio, buf, MAXBUF);
-  }
+    while (n > 0) {
+        printf("Client received response:\n%s\n", buf); // DEBUG
+        fflush(stdout);  // Ensure output appears immediately
+        n = Rio_readlineb(&rio, buf, MAXBUF);
+    }
 }
 
 int main(int argc, char *argv[])

@@ -121,6 +121,10 @@ void requestServeStatic(int fd, char* filename, int filesize, struct timeval arr
         return;
     }
 
+    printf("Sending file %s of size %d\n", filename, filesize);
+    fflush(stdout);
+
+
     // **Memory-map the file for fast serving**
     srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
     Close(srcfd);
@@ -194,7 +198,8 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
         fprintf(stderr, "Error: Received NULL thread stats\n");
         return;
     }
-
+    printf("Handling request for fd=%d\n", fd); // DEBUG
+    fflush(stdout);
     rio_t rio;
     char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
 
@@ -206,6 +211,8 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
         return;
     }
     sscanf(buf, "%s %s %s", method, uri, version);
+    printf("Method: %s, URI: %s, Version: %s\n", method, uri, version);
+    fflush(stdout);
 
     // Only support GET requests
     if (strcasecmp(method, "GET") != 0) {
@@ -220,7 +227,8 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
     char filename[MAXLINE], cgiargs[MAXLINE];
     int is_static = isStaticRequest(uri);
     requestParseURI(uri, filename, cgiargs);
-
+    printf("Requested filename: %s\n", filename); // DEBUG
+    fflush(stdout);
     struct stat sbuf;
     if (stat(filename, &sbuf) < 0) {
         requestError(fd, filename, "404", "Not Found", "File not found", arrival, dispatch, t_stats);
