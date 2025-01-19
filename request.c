@@ -215,17 +215,21 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
 
     Rio_readinitb(&rio, fd);
 
-    // Read request line (ensuring it is properly formatted)
-    if (Rio_readlineb(&rio, buf, MAXLINE) <= 0) {
-        fprintf(stderr, "Error: Failed to read request line (fd=%d)\n", fd);
-        return;
-    }
+    // Read request line properly, skipping any empty lines
+    int n;
+    do {
+        n = Rio_readlineb(&rio, buf, MAXLINE);
+        if (n <= 0) {
+            fprintf(stderr, "Error: Failed to read request line (fd=%d)\n", fd);
+            return;
+        }
+    } while (strcmp(buf, "\r\n") == 0 || strcmp(buf, "\n") == 0);  // Skip empty lines
 
     // Debug print of received request
     printf("Raw request line: %s", buf);
     fflush(stdout);
 
-    // Properly parse the request
+    // Properly parse the request line
     if (sscanf(buf, "%s %s %s", method, uri, version) != 3) {
         printf("ERROR: Malformed request line (fd=%d): %s\n", fd, buf);
         fflush(stdout);
