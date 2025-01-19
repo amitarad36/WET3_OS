@@ -210,22 +210,69 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
     }
 
     rio_t rio;
-    char buf[MAXLINE];
+    char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
 
     Rio_readinitb(&rio, fd);
 
-    printf("DEBUG: Reading full request from client...\n");
-    fflush(stdout);
-
-    // Read and print each line to see what's happening
-    while (Rio_readlineb(&rio, buf, MAXLINE) > 0) {
-        printf("DEBUG: Received line -> %s", buf);
-        fflush(stdout);
-        if (strcmp(buf, "\r\n") == 0 || strcmp(buf, "\n") == 0) break; // Stop at empty line
+    // **Read first line separately to ensure it's captured**
+    if (Rio_readlineb(&rio, buf, MAXLINE) <= 0) {
+        fprintf(stderr, "Error: Failed to read request line (fd=%d)\n", fd);
+        return;
     }
 
-    printf("DEBUG: Finished reading full request.\n");
+    // Debug print the first request line
+    printf("DEBUG: First request line -> %s", buf);
     fflush(stdout);
 
-    requestError(fd, "Malformed request", "400", "Bad Request", "Server could not understand the request", arrival, dispatch, t_stats);
+    // Parse the request line properly
+    if (sscanf(buf, "%s %s %s", method, uri, version) != 3) {
+        printf("ERROR: Malformed request line (fd=%d): %s\n", fd, buf);
+        fflush(stdout);
+        requestError(fd, "Malformed request", "400", "Bad Request", "Server could not understand the request", arrival, dispatch, t_stats);
+        return;
+    }
+
+    printf("Parsed request - fd=%d, Method: %s, URI: %s, Version: %s\n", fd, method, uri, version);
+    fflush(stdout);
+
+    // **Now read the headers**
+    printf("Reading headers for fd=%d...\n", fd);
+    fflush(stdout);
+    while (Rio_readlineb(&rio, buf, MAXLINE) > 0) {
+        if (strcmp(buf, "\r\n") == 0 || strcmp(buf, "\n") == 0) break; // Stop at empty line
+        printf("DEBUG: Header -> %s", buf);
+        fflush(stdout);
+    }
+
+    printf("Finished reading headers for fd=%d.\n", fd);
+    fflush(stdout);
+
+    // Determine if the request is static or dynamic
+    char filename[MAXLINE], cgiargs[MAXLINE];
+    int is_static = isStaticRequest(uri);
+    requestParseURI(uri, filename, cgiargs);
+
+    printf("Requested filename: %s (fd=%d)\n", filename, fd);
+    fflush(stdout);
+
+    // Check if the requested file exists
+    struct stat sbuf;
+    if (stat(filename, &sbuf) < 0) {
+        printf("ERROR: File not found: %s (fd=%d)\n", filename, fd);
+        fflush(stdout);
+        requestError(fd, filename, "404", "Not Found", "File not found", arrival, dispatch, t_stats);
+        return;
+    }
+
+    // Serve the request
+    if (is_static) {
+        printf("Serving static content: %s (fd=%d)\n", filename, fd);
+        fflush(stdout);
+        requestServeStatic(fd, filename, sbuf.st_size, arrival, dispatch, t_stats);
+    }
+    else {
+        printf("Serving dynamic content: %s (fd=%d)\n", filename, fd);
+        fflush(stdout);
+        requestServeDynamic(fd, filename, cgiargs);
+    }
 }
