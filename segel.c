@@ -398,22 +398,23 @@ ssize_t rio_readnb(rio_t *rp, void *usrbuf, size_t n)
  * rio_readlineb - robustly read a text line (buffered)
  */
 /* $begin rio_readlineb */
-ssize_t rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen) 
-{
+ssize_t rio_readlineb(rio_t* rp, void* usrbuf, size_t maxlen) {
     int n, rc;
-    char c, *bufp = usrbuf;
+    char c, * bufp = usrbuf;
 
-    for (n = 1; n < maxlen; n++) { 
+    for (n = 1; n < maxlen; n++) {
         if ((rc = rio_read(rp, &c, 1)) == 1) {
             *bufp++ = c;
             if (c == '\n')
                 break;
-        } else if (rc == 0) {
+        }
+        else if (rc == 0) {
             if (n == 1)
                 return 0; /* EOF, no data read */
             else
                 break;    /* EOF, some data was read */
-        } else
+        }
+        else
             return -1;    /* error */
     }
     *bufp = 0;
