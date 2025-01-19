@@ -7,12 +7,23 @@ void initQueue(Queue* q, int capacity) {
     q->capacity = capacity;
     q->size = 0;
     q->front = 0;
-    q->rear = -1;
-    q->buffer = malloc(sizeof(Request) * capacity); 
+    q->rear = 0;
+    q->vip_size = 0;
+    q->vip_front = 0;
+    q->vip_rear = 0;
+
+    q->buffer = malloc(sizeof(Request) * capacity);
     if (q->buffer == NULL) {
         fprintf(stderr, "Error: Queue memory allocation failed\n");
         exit(1);
     }
+
+    q->vip_buffer = malloc(sizeof(Request) * capacity);
+    if (q->vip_buffer == NULL) {
+        fprintf(stderr, "Error: VIP Queue memory allocation failed\n");
+        exit(1);
+    }
+
     pthread_mutex_init(&q->lock, NULL);
     pthread_cond_init(&q->not_empty, NULL);
     pthread_cond_init(&q->not_full, NULL);
@@ -68,13 +79,16 @@ Request dequeue(Queue* q, int is_vip) {
         return (Request) { -1, { 0, 0 } };
     }
 
+    printf("Stored request at front (fd=%d)\n", q->buffer[q->front].connfd);
+    fflush(stdout);
+
     if (is_vip && q->vip_size > 0) {
-        req = q->vip_buffer[q->vip_front];
+        req = q->vip_buffer[q->vip_front];  // Copy struct
         q->vip_front = (q->vip_front + 1) % q->capacity;
         q->vip_size--;
     }
     else {
-        req = q->buffer[q->front];
+        req = q->buffer[q->front];  // Copy struct
         q->front = (q->front + 1) % q->capacity;
         q->size--;
     }
