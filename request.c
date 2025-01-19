@@ -210,7 +210,7 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
     }
 
     rio_t rio;
-    char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
+    char buf[MAXLINE];
 
     Rio_readinitb(&rio, fd);
 
