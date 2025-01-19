@@ -65,7 +65,7 @@ Request dequeue(Queue* q, int is_vip) {
         q->front = (q->front + 1) % q->capacity;
         q->size--;
     }
-    printf("Dequeued request (fd=%d)\n", req.connfd);
+    printf("Dequeued request (fd=%d) | Queue Size Before: %d\n", req.connfd, q->size + 1);
     fflush(stdout);
 
     pthread_mutex_unlock(&q->lock);

@@ -75,8 +75,9 @@ void* worker_thread(void* arg) {
         // Ensure we actually dequeued a request
         Request req = dequeue(&request_queue, 0);
         pthread_mutex_unlock(&request_queue.lock);
-        printf("Worker processing request (fd=%d)\n", req.connfd);
+        printf("Worker thread dequeued request (fd=%d)\n", req.connfd);
         fflush(stdout);
+
 
         if (req.connfd == -1) {
             continue; // If request is invalid, go back to waiting
