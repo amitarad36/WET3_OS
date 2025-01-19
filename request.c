@@ -13,28 +13,18 @@ pthread_mutex_t stat_lock = PTHREAD_MUTEX_INITIALIZER;
 void requestError(int fd, char* cause, char* errnum, char* shortmsg, char* longmsg, struct timeval arrival, struct timeval dispatch, threads_stats t_stats) {
     char buf[MAXLINE], body[MAXBUF];
 
-    // Create the body of the error message
     sprintf(body, "<html><title>OS-HW3 Error</title>");
     sprintf(body, "%s<body bgcolor=\"ffffff\">\r\n", body);
     sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
     sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
     sprintf(body, "%s<hr>OS-HW3 Web Server\r\n", body);
 
-    // Write out the header information for this response
     sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
     sprintf(buf, "%sContent-Type: text/html\r\n", buf);
     sprintf(buf, "%sContent-Length: %lu\r\n\r\n", buf, strlen(body));
 
-    printf("Sending error response (fd=%d):\n%s", fd, buf);
-    fflush(stdout);
-
-    Rio_writen(fd, buf, strlen(buf));  // No assignment
-    printf("Successfully sent error headers to client (fd=%d)\n", fd);
-    fflush(stdout);
-
-    Rio_writen(fd, body, strlen(body));  // No assignment
-    printf("Successfully sent error body to client (fd=%d)\n", fd);
-    fflush(stdout);
+    Rio_writen(fd, buf, strlen(buf));
+    Rio_writen(fd, body, strlen(body));
 }
 
 //
@@ -43,18 +33,10 @@ void requestError(int fd, char* cause, char* errnum, char* shortmsg, char* longm
 void requestReadhdrs(rio_t* rp) {
     char buf[MAXLINE];
 
-    printf("Reading headers...\n"); // Debug print
-    fflush(stdout);
-
     Rio_readlineb(rp, buf, MAXLINE);
     while (strcmp(buf, "\r\n")) {
-        printf("Header: %s", buf);  // Debug: Print headers received
-        fflush(stdout);
         Rio_readlineb(rp, buf, MAXLINE);
     }
-
-    printf("Finished reading headers.\n"); // Debug print
-    fflush(stdout);
 }
 
 //
@@ -65,7 +47,7 @@ int requestParseURI(char* uri, char* filename, char* cgiargs) {
 
     if (strstr(uri, "..")) {
         sprintf(filename, "./public/home.html");
-        return 1;  // Static request
+        return 1;
     }
 
     if (!strstr(uri, "cgi")) {
@@ -119,37 +101,17 @@ void requestServeStatic(int fd, char* filename, int filesize, struct timeval arr
         return;
     }
 
-    printf("Sending static file: %s (fd=%d)\n", filename, fd);
-    fflush(stdout);
-
-    // Memory-map the file for fast serving
     srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
     Close(srcfd);
 
-    // Send response headers
     sprintf(buf, "HTTP/1.0 200 OK\r\n");
     sprintf(buf, "%sServer: OS-HW3 Web Server\r\n", buf);
     sprintf(buf, "%sContent-Length: %d\r\n", buf, filesize);
     sprintf(buf, "%sContent-Type: %s\r\n\r\n", buf, filetype);
 
-    printf("Sending response headers:\n%s", buf);
-    fflush(stdout);
-
-    Rio_writen(fd, buf, strlen(buf));  // No assignment
-    printf("Successfully sent response headers to client (fd=%d)\n", fd);
-    fflush(stdout);
-
-    // Send the file content
-    printf("Sending file content to fd=%d\n", fd);
-    fflush(stdout);
-
-    Rio_writen(fd, srcp, filesize);  // No assignment
-    printf("Successfully sent file content to client (fd=%d)\n", fd);
-    fflush(stdout);
-
+    Rio_writen(fd, buf, strlen(buf));
+    Rio_writen(fd, srcp, filesize);
     Munmap(srcp, filesize);
-    printf("Finished sending file: %s (fd=%d)\n", filename, fd);
-    fflush(stdout);
 }
 
 //
@@ -173,9 +135,9 @@ void requestServeDynamic(int fd, char* filename, char* cgiargs) {
 int isStaticRequest(char* uri) {
     if (strstr(uri, ".html") || strstr(uri, ".jpg") || strstr(uri, ".png") ||
         strstr(uri, ".gif") || strstr(uri, ".css") || strstr(uri, ".js")) {
-        return 1; // Static request
+        return 1;
     }
-    return 0; // Dynamic request
+    return 0;
 }
 
 //

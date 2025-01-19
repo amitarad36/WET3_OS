@@ -20,7 +20,6 @@ Queue request_queue;
 void* vip_thread(void* arg) {
     threads_stats t_stats = malloc(sizeof(struct Threads_stats));
     if (t_stats == NULL) {
-        fprintf(stderr, "Error: Failed to allocate memory for VIP thread stats\n");
         pthread_exit(NULL);
     }
     t_stats->id = -1;
@@ -48,7 +47,6 @@ void* vip_thread(void* arg) {
 
 void getargs(int* port, int* threads, int* queue_size, char** schedalg, int argc, char* argv[]) {
     if (argc < 5) {
-        fprintf(stderr, "Usage: %s <port> <threads> <queue_size> <schedalg>\n", argv[0]);
         exit(1);
     }
     *port = atoi(argv[1]);
@@ -62,33 +60,16 @@ void* worker_thread(void* arg) {
 
     while (1) {
         pthread_mutex_lock(&request_queue.lock);
-        printf("Worker thread waiting for requests...\n");
-        fflush(stdout);
-
         while (isQueueEmpty(&request_queue)) {
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
         }
-
-        printf("Worker thread woke up to process request...\n");
-        fflush(stdout);
         pthread_mutex_unlock(&request_queue.lock);
-
-        printf("Worker thread attempting to dequeue...\n"); // DEBUG
-        fflush(stdout);
 
         Request req = dequeue(&request_queue, 0);
 
-        printf("Worker received request fd=%d from dequeue\n", req.connfd);
-        fflush(stdout);
-
         if (req.connfd <= 0) {
-            printf("ERROR: Invalid fd received by worker thread: %d\n", req.connfd);
-            fflush(stdout);
             continue;
         }
-
-        printf("Worker processing request (fd=%d)\n", req.connfd);
-        fflush(stdout);
 
         struct timeval dispatch;
         gettimeofday(&dispatch, NULL);
@@ -106,19 +87,16 @@ int main(int argc, char* argv[]) {
     char* schedalg;
 
     getargs(&port, &threads, &queue_size, &schedalg, argc, argv);
-
     initQueue(&request_queue, queue_size);
 
     pthread_t* worker_threads = malloc(sizeof(pthread_t) * threads);
     if (worker_threads == NULL) {
-        fprintf(stderr, "Error: Failed to allocate memory for worker threads\n");
         exit(1);
     }
 
     for (int i = 0; i < threads; i++) {
         threads_stats t_stats = malloc(sizeof(struct Threads_stats));
         if (t_stats == NULL) {
-            fprintf(stderr, "Error: Failed to allocate memory for thread stats\n");
             exit(1);
         }
         t_stats->id = i;
@@ -127,7 +105,6 @@ int main(int argc, char* argv[]) {
         t_stats->total_req = 0;
 
         if (pthread_create(&worker_threads[i], NULL, worker_thread, (void*)t_stats) != 0) {
-            fprintf(stderr, "Error: Failed to create worker thread %d\n", i);
             free(t_stats);
             exit(1);
         }
@@ -135,7 +112,6 @@ int main(int argc, char* argv[]) {
 
     pthread_t vip_thread_id;
     if (pthread_create(&vip_thread_id, NULL, vip_thread, NULL) != 0) {
-        fprintf(stderr, "Error: Failed to create VIP thread\n");
         exit(1);
     }
 
@@ -144,23 +120,14 @@ int main(int argc, char* argv[]) {
     while (1) {
         clientlen = sizeof(clientaddr);
         connfd = Accept(listenfd, (SA*)&clientaddr, (socklen_t*)&clientlen);
-        printf("Accepted connection from client (fd=%d)\n", connfd);
-        fflush(stdout);
 
-        // Capture the arrival time of the request
         struct timeval arrival;
         gettimeofday(&arrival, NULL);
 
         int is_vip = getRequestType(connfd);
-
-        printf("About to enqueue request (fd=%d)...\n", connfd);
-        fflush(stdout);
-
         enqueue(&request_queue, (Request) { connfd, arrival }, is_vip);
-
-        printf("Request successfully enqueued (fd=%d)\n", connfd);
-        fflush(stdout);
     }
+
     for (int i = 0; i < threads; i++) {
         pthread_join(worker_threads[i], NULL);
     }

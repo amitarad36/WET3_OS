@@ -26,19 +26,15 @@
 /*
  * Send an HTTP request for the specified file 
  */
-void clientSend(int fd, char* filename, char* method)
-{
+void clientSend(int fd, char* filename, char* method) {
     char buf[MAXLINE];
     char hostname[MAXLINE];
 
     Gethostname(hostname, MAXLINE);
 
     /* Form and send the HTTP request */
-    sprintf(buf, "%s %s HTTP/1.1\r\n", method, filename);  // Ensure \r\n
+    sprintf(buf, "%s %s HTTP/1.1\r\n", method, filename);
     sprintf(buf, "%shost: %s\r\n\r\n", buf, hostname);
-
-    printf("Client sending request:\n%s\n", buf); // DEBUG
-    fflush(stdout);
 
     Rio_writen(fd, buf, strlen(buf));
 }
@@ -54,57 +50,43 @@ void clientPrint(int fd) {
 
     Rio_readinitb(&rio, fd);
 
-    /* Read and display the HTTP Header */
+    /* Read the HTTP Header */
     n = Rio_readlineb(&rio, buf, MAXBUF);
     while (strcmp(buf, "\r\n") && (n > 0)) {
-        printf("Header: %s", buf);
-        fflush(stdout);
         n = Rio_readlineb(&rio, buf, MAXBUF);
 
         if (sscanf(buf, "Content-Length: %d ", &length) == 1) {
-            printf("Length = %d\n", length);
-            fflush(stdout);
+            length = length;  // Placeholder to avoid unused variable warning
         }
     }
 
-    /* Read and display the HTTP Body */
-    printf("Reading response body...\n");
-    fflush(stdout);
+    /* Read the HTTP Body */
     n = Rio_readlineb(&rio, buf, MAXBUF);
     while (n > 0) {
-        printf("%s", buf);
-        fflush(stdout);
         n = Rio_readlineb(&rio, buf, MAXBUF);
     }
-
-    printf("Finished reading response.\n");
-    fflush(stdout);
 }
 
-int main(int argc, char *argv[])
-{
-  char *host, *filename, *method;
-  int port;
-  int clientfd;
+int main(int argc, char* argv[]) {
+    char* host, * filename, * method;
+    int port;
+    int clientfd;
 
-  if (argc != 5) {
-    fprintf(stderr, "Usage: %s <host> <port> <filename> <method>\n", argv[0]);
-    exit(1);
-  }
+    if (argc != 5) {
+        fprintf(stderr, "Usage: %s <host> <port> <filename> <method>\n", argv[0]);
+        exit(1);
+    }
 
-  host = argv[1];
-  port = atoi(argv[2]);
-  filename = argv[3];
-  method = argv[4];
+    host = argv[1];
+    port = atoi(argv[2]);
+    filename = argv[3];
+    method = argv[4];
 
-  /* Open a single connection to the specified host and port */
-  clientfd = Open_clientfd(host, port);
-  printf("clientfd = %d\n", clientfd);
-  clientSend(clientfd, filename, method);
-  printf("sent");
-  clientPrint(clientfd);
-    
-  Close(clientfd);
+    /* Open a single connection to the specified host and port */
+    clientfd = Open_clientfd(host, port);
+    clientSend(clientfd, filename, method);
+    clientPrint(clientfd);
 
-  exit(0);
+    Close(clientfd);
+    exit(0);
 }

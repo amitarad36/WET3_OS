@@ -14,13 +14,11 @@ void initQueue(Queue* q, int capacity) {
 
     q->buffer = malloc(sizeof(Request) * capacity);
     if (q->buffer == NULL) {
-        fprintf(stderr, "Error: Queue memory allocation failed\n");
         exit(1);
     }
 
     q->vip_buffer = malloc(sizeof(Request) * capacity);
     if (q->vip_buffer == NULL) {
-        fprintf(stderr, "Error: VIP Queue memory allocation failed\n");
         exit(1);
     }
 
@@ -82,10 +80,7 @@ int isQueueFull(Queue* q) {
 }
 
 int isQueueEmpty(Queue* q) {
-    int result = (q->size == 0);
-    printf("isQueueEmpty() called: returning %d (size=%d)\n", result, q->size);
-    fflush(stdout);
-    return result;
+    return q->size == 0;
 }
 
 void destroyQueue(Queue* q) {
@@ -96,11 +91,11 @@ void destroyQueue(Queue* q) {
 }
 
 void dropRandomRequests(Queue* q, int percentage) {
-    int to_remove = (q->size * percentage) / 100; // Calculate how many to drop
+    int to_remove = (q->size * percentage) / 100;
     for (int i = 0; i < to_remove; i++) {
         int rand_index = (q->front + rand() % q->size) % q->capacity;
         for (int j = rand_index; j != q->rear; j = (j + 1) % q->capacity) {
-            q->buffer[j] = q->buffer[(j + 1) % q->capacity]; // Shift elements left
+            q->buffer[j] = q->buffer[(j + 1) % q->capacity];
         }
         q->rear = (q->rear - 1 + q->capacity) % q->capacity;
         q->size--;
