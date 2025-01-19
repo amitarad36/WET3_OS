@@ -23,19 +23,32 @@ void requestError(int fd, char* cause, char* errnum, char* shortmsg, char* longm
     // Write out the header information for this response
     sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
     sprintf(buf, "%sContent-Type: text/html\r\n", buf);
-    sprintf(buf, "%sContent-Length: %lu\r\n", buf, strlen(body));
+    sprintf(buf, "%sContent-Length: %lu\r\n\r\n", buf, strlen(body));
 
-    // Add statistics headers
-    sprintf(buf, "%sStat-Req-Arrival:: %lu.%06lu\r\n", buf, arrival.tv_sec, arrival.tv_usec);
-    sprintf(buf, "%sStat-Req-Dispatch:: %lu.%06lu\r\n", buf, dispatch.tv_sec, dispatch.tv_usec);
-    sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, t_stats->id);
-    sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, t_stats->total_req);
-    sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, t_stats->stat_req);
-    sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n\r\n", buf, t_stats->dynm_req);
+    printf("Sending error response (fd=%d):\n%s", fd, buf);
+    fflush(stdout);
 
-    // Send response
-    Rio_writen(fd, buf, strlen(buf));
-    Rio_writen(fd, body, strlen(body));
+    ssize_t bytes_written = Rio_writen(fd, buf, strlen(buf));
+    if (bytes_written < 0) {
+        printf("ERROR: Failed to write error headers to client (fd=%d)\n", fd);
+        fflush(stdout);
+        return;
+    }
+    else {
+        printf("Successfully sent %ld bytes of error headers to client (fd=%d)\n", bytes_written, fd);
+        fflush(stdout);
+    }
+
+    bytes_written = Rio_writen(fd, body, strlen(body));
+    if (bytes_written < 0) {
+        printf("ERROR: Failed to write error body to client (fd=%d)\n", fd);
+        fflush(stdout);
+        return;
+    }
+    else {
+        printf("Successfully sent %ld bytes of error body to client (fd=%d)\n", bytes_written, fd);
+        fflush(stdout);
+    }
 }
 
 //
@@ -114,40 +127,56 @@ void requestServeStatic(int fd, char* filename, int filesize, struct timeval arr
 
     requestGetFiletype(filename, filetype);
 
-    // **Check if file exists**
     srcfd = Open(filename, O_RDONLY, 0);
     if (srcfd < 0) {
         requestError(fd, filename, "404", "Not Found", "File not found", arrival, dispatch, t_stats);
         return;
     }
 
-    printf("Sending file %s of size %d\n", filename, filesize);
+    printf("Sending static file: %s (fd=%d)\n", filename, fd);
     fflush(stdout);
 
-
-    // **Memory-map the file for fast serving**
+    // Memory-map the file for fast serving
     srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
     Close(srcfd);
 
-    // **Send Response Headers**
+    // Send response headers
     sprintf(buf, "HTTP/1.0 200 OK\r\n");
     sprintf(buf, "%sServer: OS-HW3 Web Server\r\n", buf);
     sprintf(buf, "%sContent-Length: %d\r\n", buf, filesize);
-    sprintf(buf, "%sContent-Type: %s\r\n", buf, filetype);
-    sprintf(buf, "%sStat-Req-Arrival:: %lu.%06lu\r\n", buf, arrival.tv_sec, arrival.tv_usec);
-    sprintf(buf, "%sStat-Req-Dispatch:: %lu.%06lu\r\n", buf, dispatch.tv_sec, dispatch.tv_usec);
-    sprintf(buf, "%sStat-Thread-Id:: %d\r\n", buf, t_stats->id);
-    sprintf(buf, "%sStat-Thread-Count:: %d\r\n", buf, t_stats->total_req);
-    sprintf(buf, "%sStat-Thread-Static:: %d\r\n", buf, t_stats->stat_req);
-    sprintf(buf, "%sStat-Thread-Dynamic:: %d\r\n\r\n", buf, t_stats->dynm_req);
+    sprintf(buf, "%sContent-Type: %s\r\n\r\n", buf, filetype);
 
-    Rio_writen(fd, buf, strlen(buf));
+    printf("Sending response headers:\n%s", buf);
+    fflush(stdout);
 
-    // **Send the file content**
-    Rio_writen(fd, srcp, filesize);
+    ssize_t bytes_written = Rio_writen(fd, buf, strlen(buf));
+    if (bytes_written < 0) {
+        printf("ERROR: Failed to write response headers to client (fd=%d)\n", fd);
+        fflush(stdout);
+        return;
+    }
+    else {
+        printf("Successfully sent %ld bytes of headers to client (fd=%d)\n", bytes_written, fd);
+        fflush(stdout);
+    }
+
+    // Send the file content
+    printf("Sending file content to fd=%d\n", fd);
+    fflush(stdout);
+
+    bytes_written = Rio_writen(fd, srcp, filesize);
+    if (bytes_written < 0) {
+        printf("ERROR: Failed to write file content to client (fd=%d)\n", fd);
+        fflush(stdout);
+        return;
+    }
+    else {
+        printf("Successfully sent %ld bytes of file content to client (fd=%d)\n", bytes_written, fd);
+        fflush(stdout);
+    }
+
     Munmap(srcp, filesize);
-
-    printf("Static file served successfully: %s\n", filename);
+    printf("Finished sending file: %s (fd=%d)\n", filename, fd);
     fflush(stdout);
 }
 

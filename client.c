@@ -46,8 +46,7 @@ void clientSend(int fd, char* filename, char* method)
 /*
  * Read the HTTP response and print it out
  */
-void clientPrint(int fd)
-{
+void clientPrint(int fd) {
     rio_t rio;
     char buf[MAXBUF];
     int length = 0;
@@ -59,10 +58,9 @@ void clientPrint(int fd)
     n = Rio_readlineb(&rio, buf, MAXBUF);
     while (strcmp(buf, "\r\n") && (n > 0)) {
         printf("Header: %s", buf);
-        fflush(stdout);  // Ensure output appears immediately
+        fflush(stdout);
         n = Rio_readlineb(&rio, buf, MAXBUF);
 
-        /* If you want to look for certain HTTP tags... */
         if (sscanf(buf, "Content-Length: %d ", &length) == 1) {
             printf("Length = %d\n", length);
             fflush(stdout);
@@ -70,12 +68,17 @@ void clientPrint(int fd)
     }
 
     /* Read and display the HTTP Body */
+    printf("Reading response body...\n");
+    fflush(stdout);
     n = Rio_readlineb(&rio, buf, MAXBUF);
     while (n > 0) {
-        printf("Client received response:\n%s\n", buf); // DEBUG
-        fflush(stdout);  // Ensure output appears immediately
+        printf("%s", buf);
+        fflush(stdout);
         n = Rio_readlineb(&rio, buf, MAXBUF);
     }
+
+    printf("Finished reading response.\n");
+    fflush(stdout);
 }
 
 int main(int argc, char *argv[])
