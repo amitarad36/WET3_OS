@@ -62,27 +62,28 @@ void* worker_thread(void* arg) {
 
     while (1) {
         pthread_mutex_lock(&request_queue.lock);
-
         printf("Worker thread waiting for requests...\n");
         fflush(stdout);
 
         while (isQueueEmpty(&request_queue)) {
             pthread_cond_wait(&request_queue.not_empty, &request_queue.lock);
         }
+
         printf("Worker thread woke up to process request...\n");
         fflush(stdout);
+        pthread_mutex_unlock(&request_queue.lock);
+
         printf("Worker thread attempting to dequeue...\n"); // DEBUG
         fflush(stdout);
 
-
-        // Ensure we actually dequeued a request
         Request req = dequeue(&request_queue, 0);
-        pthread_mutex_unlock(&request_queue.lock);
-        printf("Worker thread dequeued request (fd=%d)\n", req.connfd);
+
+        printf("Worker received request fd=%d from dequeue\n", req.connfd);
         fflush(stdout);
 
-
         if (req.connfd == -1) {
+            printf("Invalid request received, skipping...\n");
+            fflush(stdout);
             continue; // If request is invalid, go back to waiting
         }
 
