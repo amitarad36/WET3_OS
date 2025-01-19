@@ -215,19 +215,30 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
 
     Rio_readinitb(&rio, fd);
 
-    // Read request line
+    // Read request line (ensuring it is properly formatted)
     if (Rio_readlineb(&rio, buf, MAXLINE) <= 0) {
         fprintf(stderr, "Error: Failed to read request line (fd=%d)\n", fd);
         return;
     }
-    sscanf(buf, "%s %s %s", method, uri, version);
+
+    // Debug print of received request
+    printf("Raw request line: %s", buf);
+    fflush(stdout);
+
+    // Properly parse the request
+    if (sscanf(buf, "%s %s %s", method, uri, version) != 3) {
+        printf("ERROR: Malformed request line (fd=%d): %s\n", fd, buf);
+        fflush(stdout);
+        requestError(fd, "Malformed request", "400", "Bad Request", "Server could not understand the request", arrival, dispatch, t_stats);
+        return;
+    }
 
     printf("Parsed request - fd=%d, Method: %s, URI: %s, Version: %s\n", fd, method, uri, version);
     fflush(stdout);
 
     // Only support GET requests
     if (strcasecmp(method, "GET") != 0) {
-        printf("ERROR: Unsupported method %s received (fd=%d)\n", method, fd);
+        printf("ERROR: Unsupported method received (fd=%d): %s\n", fd, method);
         fflush(stdout);
         requestError(fd, method, "501", "Not Implemented", "Server does not support this method", arrival, dispatch, t_stats);
         return;
